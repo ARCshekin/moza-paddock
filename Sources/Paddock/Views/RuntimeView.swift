@@ -38,6 +38,8 @@ struct RuntimeView: View {
             HStack {
                 Button { model.openSteam() } label: { Label("Открыть Steam", systemImage: "play.desktopcomputer") }
                     .disabled(model.operation != nil || (model.runtime == .standalone && model.runtimeStatus?.prepared != true))
+                Button("Проверить графику") { model.diagnoseRuntime() }
+                    .disabled(model.gameRunning || model.operation != nil || (model.runtime == .standalone && model.runtimeStatus?.installed != true))
                 Button("Журналы") { NSWorkspace.shared.open(model.paths.store) }
                 Spacer()
                 Button("Обновить статус") { model.refreshRuntimeStatus() }

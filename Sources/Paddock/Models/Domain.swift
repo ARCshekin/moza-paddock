@@ -129,7 +129,6 @@ struct PaddockPaths {
     var game: URL { bottleURL.appendingPathComponent("drive_c/Program Files (x86)/Steam/steamapps/common/assettocorsa") }
     var documents: URL { documentsOverride ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents/Assetto Corsa") }
     var store: URL { storeOverride ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/MozaPaddock") }
-    var wine: URL { FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications/CrossOver.app/Contents/SharedSupport/CrossOver/bin/wine") }
     static var current: PaddockPaths {
         let resource = Bundle.main.resourceURL?.appendingPathComponent("project-path.txt")
         let project = resource.flatMap { try? String(contentsOf: $0).trimmingCharacters(in: .whitespacesAndNewlines) }

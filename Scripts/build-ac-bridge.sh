@@ -38,3 +38,7 @@ print "Built Bridge/build/dinput8.dll"
 "$llvm_bin/llvm-dlltool" -m i386:x86-64 -d Bridge/display-user32.def -l Bridge/build/display-user32.lib
 "${link[@]}" /Brepro /nodefaultlib /machine:x64 /entry:main /subsystem:windows /dynamicbase /nxcompat /out:Bridge/build/moza-display-launcher.exe Bridge/build/display-launcher.obj Bridge/build/display-kernel32.lib Bridge/build/display-user32.lib
 print "Built Bridge/build/moza-display-launcher.exe"
+"$llvm_bin/clang" --target=x86_64-pc-windows-msvc -std=c11 -O2 -ffreestanding -fno-builtin -fno-stack-protector -Wall -Wextra -Werror -c Bridge/runtime-probe.c -o Bridge/build/runtime-probe.obj
+"$llvm_bin/llvm-dlltool" -m i386:x86-64 -d Bridge/runtime-kernel32.def -l Bridge/build/runtime-kernel32.lib
+"${link[@]}" /Brepro /nodefaultlib /machine:x64 /entry:main /subsystem:console /dynamicbase /nxcompat /out:Bridge/build/moza-runtime-probe.exe Bridge/build/runtime-probe.obj Bridge/build/runtime-kernel32.lib Bridge/build/display-user32.lib
+print "Built Bridge/build/moza-runtime-probe.exe"

@@ -75,6 +75,25 @@ extension PaddockController {
             return "Среда Wine готова. Откройте Steam и проверьте вход в аккаунт."
         }
     }
+    func diagnoseRuntime() {
+        let paths = self.paths
+        work("Проверяю Direct3D 11 и экраны…") {
+            let probe = paths.project.appendingPathComponent("Bridge/build/moza-runtime-probe.exe")
+            guard FileManager.default.fileExists(atPath: probe.path) else { throw PaddockError("Соберите Windows-мост скриптом build-ac-bridge.sh.") }
+            try FileManager.default.createDirectory(at: paths.store, withIntermediateDirectories: true)
+            let log = paths.store.appendingPathComponent("graphics-check.log")
+            FileManager.default.createFile(atPath: log.path, contents: nil)
+            let handle = try FileHandle(forWritingTo: log); defer { try? handle.close() }
+            let process = WineProcess.make(paths: paths, arguments: ["Z:" + probe.path.replacingOccurrences(of: "/", with: "\\")])
+            process.standardOutput = handle; process.standardError = handle
+            try process.run(); process.waitUntilExit()
+            let text = (try? String(contentsOf: log, encoding: .utf8)) ?? ""
+            guard process.terminationStatus == 0, text.contains("D3D11 HRESULT=0x00000000") else { throw PaddockError("Direct3D 11 не прошёл проверку. Журнал: \(log.path)") }
+            let count = text.components(separatedBy: "Monitor count=0x").last?.prefix(8)
+            let monitors = count.flatMap { Int($0, radix: 16) } ?? 0
+            return "Direct3D 11 работает. Экранов в Wine: \(monitors). Журнал: graphics-check.log."
+        }
+    }
     func openSteam() {
         guard operation == nil else { return }
         let process = WineProcess.make(paths: paths, arguments: ["C:/Program Files (x86)/Steam/steam.exe"])
