@@ -1,0 +1,84 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:moza_driver}",
+            "name": "Debug mozactl",
+            "target": "mozactl",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug mozactl"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:moza_driver}",
+            "name": "Release mozactl",
+            "target": "mozactl",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release mozactl"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:moza_driver}",
+            "name": "Debug MozaControl",
+            "target": "MozaControl",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug MozaControl"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:moza_driver}",
+            "name": "Release MozaControl",
+            "target": "MozaControl",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release MozaControl"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:moza_driver}",
+            "name": "Debug moza-ac-bridge",
+            "target": "moza-ac-bridge",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug moza-ac-bridge"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:moza_driver}",
+            "name": "Release moza-ac-bridge",
+            "target": "moza-ac-bridge",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release moza-ac-bridge"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:moza_driver}",
+            "name": "Debug MozaPaddock",
+            "target": "MozaPaddock",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug MozaPaddock"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:moza_driver}",
+            "name": "Release MozaPaddock",
+            "target": "MozaPaddock",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release MozaPaddock"
+        }
+    ]
+}

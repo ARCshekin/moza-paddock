@@ -1,0 +1,43 @@
+#!/bin/zsh
+set -eu
+cd "${0:A:h:h}"
+project_dir=$PWD
+bottle=${MOZA_AC_BOTTLE:-Steam-3}
+wine="$HOME/Applications/CrossOver.app/Contents/SharedSupport/CrossOver/bin/wine"
+game="C:/Program Files (x86)/Steam/steamapps/common/assettocorsa"
+bridge="$project_dir/.build/debug/moza-ac-bridge"
+game_dir="$HOME/Library/Application Support/CrossOver/Bottles/$bottle/drive_c/Program Files (x86)/Steam/steamapps/common/assettocorsa"
+mkdir -p build
+[[ -x "$bridge" ]] || swift build --product moza-ac-bridge
+[[ -f Bridge/build/moza-display-launcher.exe ]] || ./Scripts/build-ac-bridge.sh
+cp Bridge/build/moza-display-launcher.exe "$game_dir/moza-display-launcher.exe"
+# Exclusive fullscreen chooses Wine's primary monitor. The display launcher
+# creates a borderless full-display window on the external monitor instead.
+if [[ "${MOZA_AC_KEEP_VIDEO:-0}" != 1 ]]; then
+python3 - <<'PY'
+from pathlib import Path
+import configparser
+path = Path.home() / 'Documents/Assetto Corsa/cfg/video.ini'
+config = configparser.ConfigParser()
+config.optionxform = str
+config.read(path)
+config['VIDEO']['FULLSCREEN'] = '0'
+config['VIDEO']['WIDTH'] = '1920'
+config['VIDEO']['HEIGHT'] = '1080'
+with path.open('w') as file:
+    config.write(file, space_around_delimiters=False)
+PY
+fi
+if pgrep -f '(^|/)moza-ac-bridge( |$)' >/dev/null; then
+    print 'Мост MOZA уже запущен; использую его.'
+else
+    "$bridge" --gain "${MOZA_AC_GAIN:-1}" >> build/ac-bridge-live.log 2>&1 &
+    bridge_pid=$!
+    print "$bridge_pid" > build/ac-bridge.pid
+    trap 'kill -TERM "$bridge_pid" 2>/dev/null || true' EXIT
+fi
+printf 'Assetto Corsa + MOZA R5. Игровая отдача %.0f%%, плавное включение за 2 секунды.\n' "$(( ${MOZA_AC_GAIN:-1} * 100 ))"
+print 'Экран: внешний монитор, отдельное окно без рамок на весь экран.'
+print 'Лепестки: левый — вниз, правый — вверх. Начать заезд — кнопка Drive в игре.'
+SteamAppId=244210 SteamGameId=244210 "$wine" --bottle "$bottle" \
+    --workdir "$game" --cx-app "$game/moza-display-launcher.exe"
