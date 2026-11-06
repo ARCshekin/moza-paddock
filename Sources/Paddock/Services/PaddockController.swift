@@ -394,12 +394,11 @@ final class PaddockController: ObservableObject {
     }
     static func ensureSteam(paths: PaddockPaths) throws {
         func loggedIn() -> Bool {
-            let processes = (try? command("/bin/ps", ["ax", "-o", "command="])) ?? Data()
-            let running = String(data: processes, encoding: .utf8)?.components(separatedBy: .newlines).contains {
-                let value = $0.lowercased()
-                return !value.contains("winewrapper") && (value.contains("\\steam\\steam.exe") || value.contains("/steam/steam.exe"))
-            } ?? false
-            guard running else { return false }
+            // C: paths look identical across providers. Match the loaded file
+            // in this prefix so another running Steam cannot satisfy this check.
+            let steamFile = paths.bottleURL.appendingPathComponent("drive_c/Program Files (x86)/Steam/steam.exe")
+            guard let owners = try? command("/usr/sbin/lsof", ["-Fpc", steamFile.path]),
+                  String(data: owners, encoding: .utf8)?.lowercased().components(separatedBy: .newlines).contains("csteam.exe") == true else { return false }
             // The client clears ActiveUser on sign-out. Query Wine's live
             // registry, not a potentially unflushed user.reg on disk.
             guard let data = try? wineCommand(paths, ["reg", "query", "HKCU\\Software\\Valve\\Steam\\ActiveProcess", "/v", "ActiveUser"]),
