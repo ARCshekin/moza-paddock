@@ -1,0 +1,21 @@
+{
+  "version": "June 2010 / 9.29.1974",
+  "source": "https://www.microsoft.com/en-us/download/details.aspx?id=8109",
+  "license": "Microsoft DirectX End-User Runtime; use original Steam-provided redistributable CABs; binaries are not included in this repository",
+  "components": [
+    {
+      "cab": "Jun2010_d3dx11_43_x64.cab",
+      "member": "d3dx11_43.dll",
+      "dll": "d3dx11_43.dll",
+      "cabSHA256": "c1d0d56b83bfb09a5e1a89e1898bb74446a847b30a968f3664ec2d87368eb63e",
+      "dllSHA256": "981e42629df751217406e7150477cddc853b79abd6a8568a1566298ed8f7bd59"
+    },
+    {
+      "cab": "Jun2010_D3DCompiler_43_x64.cab",
+      "member": "D3DCompiler_43.dll",
+      "dll": "d3dcompiler_43.dll",
+      "cabSHA256": "213ad66ab9e469db1e6a49a646d082bfc3700db94172984e7e36801612af50c6",
+      "dllSHA256": "44c3a7e330b54a35a9efa015831392593aa02e7da1460be429d17c3644850e8a"
+    }
+  ]
+}

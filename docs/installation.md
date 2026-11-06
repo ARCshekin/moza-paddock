@@ -1,5 +1,9 @@
 # Установка
 
+## Без CrossOver
+
+Во вкладке «Запуск» выберите Wine, установите среду и перенесите Windows Steam с Assetto Corsa. Затем откройте Steam, завершите вход и запускайте игру обычной кнопкой в Paddock. Нужна Rosetta на Apple Silicon. Полная схема, папки и версии — в [standalone-runtime](standalone-runtime.md).
+
 ## Рабочая среда CrossOver
 
 Установите купленную Assetto Corsa в Windows Steam. Исходная бутылка называется `Steam-3`; выбор доступен в приложении. CrossOver ожидается в `~/Applications/CrossOver.app`. Войдите в Steam перед запуском.

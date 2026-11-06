@@ -4,10 +4,11 @@ cd "${0:A:h:h}"
 configuration=${1:-release}
 swift build -c "$configuration" --product MozaPaddock
 swift build --product moza-ac-bridge
-[[ -f Bridge/build/moza-display-launcher.exe ]] || ./Scripts/build-ac-bridge.sh
+[[ -f Bridge/build/moza-display-launcher.exe && -f Bridge/build/moza-runtime-probe.exe && -f Bridge/build/moza-steam-cef.dll ]] || ./Scripts/build-ac-bridge.sh
 app="$PWD/build/MozaPaddock.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-cp ".build/$configuration/MozaPaddock" "$app/Contents/MacOS/MozaPaddock"
+cp ".build/$configuration/MozaPaddock" "$app/Contents/MacOS/MozaPaddock.new"
+mv -f "$app/Contents/MacOS/MozaPaddock.new" "$app/Contents/MacOS/MozaPaddock"
 print -r -- "$PWD" > "$app/Contents/Resources/project-path.txt"
 if [[ ! -f build/Paddock.icns || Scripts/paddock-icon.swift -nt build/Paddock.icns ]]; then
     swift Scripts/paddock-icon.swift build/Paddock.iconset

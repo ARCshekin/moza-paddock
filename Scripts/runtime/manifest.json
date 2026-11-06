@@ -1,0 +1,20 @@
+{
+  "wine": {
+    "version": "11.21",
+    "url": "https://github.com/Gcenx/macOS_Wine_builds/releases/download/11.21/wine-staging-11.21-osx64.tar.xz",
+    "sha256": "d7bcd5abf4df27aae397a7898aef074fea4a2e0b51e0a55aa9659517bbf9d452",
+    "archive": "wine-staging-11.21-osx64.tar.xz",
+    "bundle": "Wine Staging.app",
+    "license": "LGPL-2.1-or-later; bundled dependencies retain their licenses",
+    "source": "https://github.com/Gcenx/macOS_Wine_builds"
+  },
+  "dxvk": {
+    "version": "1.10.3-20230507-repack-builtin",
+    "url": "https://github.com/Gcenx/DXVK-macOS/releases/download/v1.10.3-20230507-repack/dxvk-macOS-async-v1.10.3-20230507-repack-builtin.tar.gz",
+    "sha256": "810b1e5caf8ce975b784fae866a130ad23fa0ea233b0e5609cbc4a45f3ef6f00",
+    "archive": "dxvk-macOS-async-v1.10.3-20230507-repack-builtin.tar.gz",
+    "directory": "dxvk-macOS-async-v1.10.3-20230507-repack-builtin",
+    "license": "Zlib",
+    "source": "https://github.com/Gcenx/DXVK-macOS"
+  }
+}

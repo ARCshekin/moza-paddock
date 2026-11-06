@@ -1,7 +1,11 @@
 name: Checks
 on:
   push:
+    branches: [main]
   pull_request:
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -17,6 +21,8 @@ jobs:
         run: swift build -c release
       - name: Native app checks without a game installation
         run: .build/release/MozaPaddock --self-test --without-game
+      - name: Standalone runtime checks
+        run: python3 Scripts/check-runtime.py
       - name: Archive installer checks
         run: python3 Scripts/check-paddock-mods.py
       - name: Bridge checks and Windows helper builds

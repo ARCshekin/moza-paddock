@@ -119,17 +119,20 @@ func lapText(_ milliseconds: Int?) -> String {
 struct PaddockPaths {
     let project: URL
     var bottle: String
+    var runtime: LaunchRuntime = .crossover
     var documentsOverride: URL? = nil
     var storeOverride: URL? = nil
-    var bottleURL: URL { FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/CrossOver/Bottles/\(bottle)") }
+    var bottleURL: URL {
+        runtime == .standalone ? store.appendingPathComponent("Prefixes/assetto") :
+            FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/CrossOver/Bottles/\(bottle)")
+    }
     var game: URL { bottleURL.appendingPathComponent("drive_c/Program Files (x86)/Steam/steamapps/common/assettocorsa") }
     var documents: URL { documentsOverride ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents/Assetto Corsa") }
     var store: URL { storeOverride ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/MozaPaddock") }
-    var wine: URL { FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications/CrossOver.app/Contents/SharedSupport/CrossOver/bin/wine") }
     static var current: PaddockPaths {
         let resource = Bundle.main.resourceURL?.appendingPathComponent("project-path.txt")
         let project = resource.flatMap { try? String(contentsOf: $0).trimmingCharacters(in: .whitespacesAndNewlines) }
             ?? FileManager.default.currentDirectoryPath
-        return .init(project: URL(fileURLWithPath: project), bottle: UserDefaults.standard.string(forKey: "paddock.bottle") ?? "Steam-3")
+        return .init(project: URL(fileURLWithPath: project), bottle: UserDefaults.standard.string(forKey: "paddock.bottle") ?? "Steam-3", runtime: LaunchRuntime(rawValue: UserDefaults.standard.string(forKey: "paddock.runtime") ?? "") ?? .crossover)
     }
 }
