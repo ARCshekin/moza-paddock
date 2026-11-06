@@ -306,6 +306,10 @@ final class PaddockController: ObservableObject {
                                 guard self.launcher === process else { return }
                                 self.launcher = nil
                                 try? self.launcherLog?.close(); self.launcherLog = nil
+                                DispatchQueue.global(qos: .utility).async {
+                                    _ = try? Self.command("/usr/bin/python3", [paths.project.appendingPathComponent("Scripts/paddock-runtime.py").path,
+                                                                           "--root", paths.store.path, "cleanup-logs"])
+                                }
                             }
                         }
                         self.launcherLog = handle; self.launcher = process

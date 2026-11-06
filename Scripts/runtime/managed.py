@@ -131,7 +131,7 @@ class ManagedRuntime:
         env.update(WINEPREFIX=str(self.prefix), WINEARCH='win64', WINEDEBUG='-all',
                    WINEDLLOVERRIDES='dinput8=n,b;d3d11,d3d10core=b;mscoree,mshtml=',
                    DXVK_LOG_PATH=str(self.logs), DXVK_STATE_CACHE_PATH=str(self.logs),
-                   MVK_CONFIG_RESUME_LOST_DEVICE='1')
+                   MVK_CONFIG_RESUME_LOST_DEVICE='1', MVK_CONFIG_LOG_LEVEL='1')
         return env
 
     def run(self, args, cwd=None, timeout=None):

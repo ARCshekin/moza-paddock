@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import subprocess
 from pathlib import Path
 import sys
 from runtime.managed import ManagedRuntime, DEFAULT_ROOT, STEAM_RELATIVE, application_arguments
@@ -13,6 +14,8 @@ def main():
     parser.add_argument('--root', type=Path, default=DEFAULT_ROOT)
     sub = parser.add_subparsers(dest='action', required=True)
     sub.add_parser('status')
+    cleanup = sub.add_parser('cleanup-logs')
+    cleanup.add_argument('--wait-game-pid', type=int)
     install = sub.add_parser('install')
     install.add_argument('--cache', type=Path)
     prepare = sub.add_parser('prepare')
@@ -26,6 +29,23 @@ def main():
     runtime = ManagedRuntime(args.root)
     if args.action == 'status':
         print(json.dumps(runtime.status()))
+    elif args.action == 'cleanup-logs':
+        import time
+        from runtime.logfiles import trim_launcher
+        if args.wait_game_pid:
+            for _ in range(43200):
+                state = subprocess.run(['/bin/ps', '-p', str(args.wait_game_pid), '-o', 'comm='], capture_output=True, text=True)
+                if state.returncode != 0 or not state.stdout.strip().lower().endswith('acs.exe'):
+                    break
+                time.sleep(1)
+            # Let the display helper, shell and native app close their handles.
+            for _ in range(30):
+                if trim_launcher(runtime.root):
+                    print('Launcher diagnostic log compacted; head and tail retained.')
+                    return
+                time.sleep(1)
+        else:
+            print('Launcher log compacted.' if trim_launcher(runtime.root) else 'Log is small or still open.')
     elif args.action == 'install':
         runtime.install(args.cache)
         print('Independent Wine runtime installed.')

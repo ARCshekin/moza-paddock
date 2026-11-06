@@ -72,3 +72,7 @@ CAB и DLL сверяются с SHA-256 из `directx-manifest.json`; пров�
 DLL устанавливаются рядом с `acs.exe`, прежние файлы при наличии сохраняются в `Backups/DirectX`. Overrides `native,builtin` задаются только для `acs.exe`. Подготовка prefix устанавливает компоненты из выбранного Steam; перед запуском игры проверяется локальный кеш. При отсутствии оригинальных CAB подготовка объясняет, какой Steam prerequisite нужен.
 
 Источник и условия использования: [Microsoft DirectX End-User Runtimes (June 2010)](https://www.microsoft.com/en-us/download/details.aspx?id=8109). Используются предоставленные с установленной игрой redistributable CAB; это не новый графический backend и не замена DXVK.
+
+## Размер журналов
+
+`MVK_CONFIG_LOG_LEVEL=1` оставляет ошибки MoltenVK и исключает повторяющиеся предупреждения descriptor pool, которые в первой проверке создавали гигабайты текста. [Значения параметра](https://github.com/KhronosGroup/MoltenVK/blob/main/Docs/MoltenVK_Configuration_Parameters.md). После завершения заезда приложение ограничивает `launcher.log`: если он больше 8 МиБ, сохраняет первые 128 КиБ и последние 2 МиБ. Открытый журнал не заменяется; пользовательские пресеты, результаты и файлы игры эта операция не затрагивает.
