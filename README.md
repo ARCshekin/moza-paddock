@@ -10,7 +10,7 @@
 - Установка автомобилей и трасс из ZIP/7z/RAR или папок с резервными копиями.
 - Отдельное окно игры на внешнем мониторе во весь экран.
 
-Рабочий исходный вариант использует CrossOver. Независимая среда Wine разрабатывается на отдельной ветке. Нужна купленная Windows-версия Assetto Corsa в Steam. Игра, Steam, Wine и пользовательские данные в репозиторий не входят.
+Доступны CrossOver и независимая бесплатная среда Wine с отдельным prefix. Установка Wine и перенос Steam доступны на вкладке «Запуск»; [устройство и ограничения](docs/standalone-runtime.md). Нужна купленная Windows-версия Assetto Corsa в Steam. Игра, Steam, Wine и пользовательские данные в репозиторий не входят.
 
 ## Быстрый старт
 
@@ -46,6 +46,7 @@ open build/MozaPaddock.app
 swift build -c release
 .build/release/MozaPaddock --self-test --without-game
 python3 Scripts/check-paddock-mods.py
+python3 Scripts/check-runtime.py
 ./Scripts/check-ac-bridge.sh
 ```
 

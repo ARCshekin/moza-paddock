@@ -31,3 +31,15 @@ downloaded Wine runtime binaries. A Steam license for the game is required.
 Any managed runtime downloads must retain upstream license notices and source
 links in the install manifest. The source license of this application does not
 grant redistribution rights to proprietary game or runtime components.
+
+## Managed downloads
+
+The pinned manifest at [Scripts/runtime/manifest.json](Scripts/runtime/manifest.json)
+fetches Wine Staging 11.21 (Wine: LGPL-2.1-or-later) from Gcenx's official WineHQ
+macOS packages and DXVK macOS 1.10.3 builtin (Zlib). Runtime bundles retain
+upstream notices for Wine, MoltenVK, Vulkan loader, Mono, Gecko and other
+dependencies. These downloads are installed locally and are not included in
+Git or application source releases. Source and build references:
+[Wine](https://gitlab.winehq.org/wine/wine),
+[macOS packages](https://github.com/Gcenx/macOS_Wine_builds),
+[DXVK macOS](https://github.com/Gcenx/DXVK-macOS).

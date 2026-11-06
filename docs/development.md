@@ -19,6 +19,7 @@ git config core.hooksPath .githooks
 swift build -c release
 .build/release/MozaPaddock --self-test --without-game
 python3 Scripts/check-paddock-mods.py
+python3 Scripts/check-runtime.py
 ./Scripts/check-ac-bridge.sh
 ```
 
