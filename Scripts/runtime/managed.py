@@ -131,7 +131,7 @@ class ManagedRuntime:
         env.update(WINEPREFIX=str(self.prefix), WINEARCH='win64', WINEDEBUG='-all',
                    WINEDLLOVERRIDES='dinput8=n,b;d3d11,d3d10core=b;mscoree,mshtml=',
                    DXVK_LOG_PATH=str(self.logs), DXVK_STATE_CACHE_PATH=str(self.logs),
-                   MVK_CONFIG_RESUME_LOST_DEVICE='1')
+                   MVK_CONFIG_RESUME_LOST_DEVICE='1', MVK_CONFIG_LOG_LEVEL='1')
         return env
 
     def run(self, args, cwd=None, timeout=None):
@@ -150,6 +150,8 @@ class ManagedRuntime:
             self.import_steam(Path(source_steam))
         if not (self.game / 'acs.exe').is_file():
             raise RuntimeError('Select a Windows Steam folder with Assetto Corsa installed')
+        from .directx import install as install_directx
+        install_directx(self, source_steam)
         # Preserve existing macOS Documents/Assetto Corsa settings via Wine shell folders.
         personal = 'Z:' + str(HOME / 'Documents').replace('/', '\\')
         for key in ('User Shell Folders', 'Shell Folders'):

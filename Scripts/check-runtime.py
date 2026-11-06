@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Offline checks: downloads and Wine processes are never started."""
 import io
+import hashlib
+import struct
+from unittest.mock import patch
 import json
 from pathlib import Path
 import sys
@@ -8,6 +11,7 @@ import tarfile
 import tempfile
 sys.path.insert(0, str(Path(__file__).parent))
 import runtime.managed as managed
+import runtime.directx as directx
 from runtime.steam_cef import install as install_cef, uninstall as uninstall_cef
 from runtime.managed import ManagedRuntime, checksum, verified_archive, validate_archive, MANIFEST, application_arguments
 
@@ -96,6 +100,33 @@ with tempfile.TemporaryDirectory() as folder:
     assert (system / 'winmm.dll').read_bytes() == b'original Wine fixture'
     assert not (fixture.prefix / 'paddock-steam-cef.json').exists()
     print('PASS Steam-only shim deployment preserves Wine DLL and can roll back')
+    fixture.root = root / 'directx-store'; fixture.root.mkdir()
+    fixture.game = fixture.prefix / 'game'; fixture.game.mkdir()
+    source_steam = root / 'Steam prereqs'
+    redist = source_steam / 'steamapps/common/Steamworks Shared/_CommonRedist/DirectX/Jun2010'
+    redist.mkdir(parents=True)
+    cab = redist / 'fixture.cab'; cab.write_bytes(b'cab fixture')
+    pe = bytearray(512); pe[:2] = b'MZ'; struct.pack_into('<I', pe, 0x3c, 128)
+    pe[128:132] = b'PE\0\0'; struct.pack_into('<H', pe, 132, 0x8664)
+    component = dict(cab='fixture.cab', dll='d3dx11_43.dll', member='d3dx11_43.dll',
+                     cabSHA256=checksum(cab), dllSHA256=hashlib.sha256(pe).hexdigest())
+    existing = fixture.game / component['dll']; existing.write_bytes(b'previous DLL fixture')
+    fixture.calls = []
+    with patch.object(directx, 'MANIFEST', {'components': [component]}), patch.object(directx.subprocess, 'check_output', return_value=bytes(pe)) as extract:
+        directx.install(fixture, source_steam)
+        assert existing.read_bytes() == bytes(pe)
+        backups = list((fixture.root / 'Backups/DirectX').iterdir())
+        assert len(backups) == 1 and backups[0].read_bytes() == b'previous DLL fixture'
+        directx.install(fixture)
+        assert extract.call_count == 1  # Cached verified DLL needs no re-extraction.
+        assert all('AppDefaults\\acs.exe\\DllOverrides' in call[2] for call in fixture.calls)
+    # A corrupt CAB is rejected before touching the current game DLL.
+    component['cabSHA256'] = '0' * 64
+    with patch.object(directx, 'MANIFEST', {'components': [component]}):
+        rejected(lambda: directx.install(fixture, source_steam))
+    assert existing.read_bytes() == bytes(pe)
+    print('PASS DirectX hashes, x64 extraction, backup, cache and acs-only overrides')
+
 
     original_manifest = dict(MANIFEST)
     cache = root / 'cache'; cache.mkdir()
