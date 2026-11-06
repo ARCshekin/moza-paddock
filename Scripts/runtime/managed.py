@@ -55,6 +55,15 @@ def extract(path, destination):
     subprocess.run(['/usr/bin/tar', '-xpf', str(path), '-C', str(destination)], check=True)
 
 
+def application_arguments(arguments):
+    """Use software compositing for Steam CEF only; games keep hardware D3D11."""
+    result = list(arguments)
+    if result and result[0].replace('\\', '/').rsplit('/', 1)[-1].lower() == 'steam.exe':
+        if '-cef-disable-gpu' not in result:
+            result.append('-cef-disable-gpu')
+    return result
+
+
 class ManagedRuntime:
     def __init__(self, root=DEFAULT_ROOT):
         self.root = Path(root)

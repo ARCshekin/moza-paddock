@@ -8,7 +8,7 @@ import tarfile
 import tempfile
 sys.path.insert(0, str(Path(__file__).parent))
 import runtime.managed as managed
-from runtime.managed import ManagedRuntime, checksum, verified_archive, validate_archive, MANIFEST
+from runtime.managed import ManagedRuntime, checksum, verified_archive, validate_archive, MANIFEST, application_arguments
 
 
 def rejected(call):
@@ -42,6 +42,11 @@ with tempfile.TemporaryDirectory() as folder:
     tar_entry('bundle/Versions/Current', 'A')
     validate_archive(archive)
     print('PASS unsafe tar names/links rejected; framework links accepted')
+    assert application_arguments(['C:/Program Files (x86)/Steam/steam.exe', '-silent'])[-1] == '-cef-disable-gpu'
+    assert application_arguments(['C:\\Steam\\Steam.exe', '-cef-disable-gpu']).count('-cef-disable-gpu') == 1
+    assert application_arguments(['C:/games/acs.exe']) == ['C:/games/acs.exe']
+    assert application_arguments(['reg', 'query']) == ['reg', 'query']
+    print('PASS CEF workaround applies only to Steam and is idempotent')
     runtime = ManagedRuntime(root / 'data')
     assert not any(runtime.status()[k] for k in ['installed', 'prepared', 'gameInstalled'])
     env = runtime.environment()
