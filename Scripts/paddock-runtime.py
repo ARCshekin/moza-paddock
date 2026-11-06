@@ -1,0 +1,63 @@
+#!/usr/bin/env python3
+"""CLI boundary shared by SwiftUI and play-assetto.command."""
+import argparse
+import json
+import os
+from pathlib import Path
+import sys
+from runtime.managed import ManagedRuntime, DEFAULT_ROOT, STEAM_RELATIVE
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--root', type=Path, default=DEFAULT_ROOT)
+    sub = parser.add_subparsers(dest='action', required=True)
+    sub.add_parser('status')
+    install = sub.add_parser('install')
+    install.add_argument('--cache', type=Path)
+    prepare = sub.add_parser('prepare')
+    prepare.add_argument('--source-steam', type=Path)
+    wine = sub.add_parser('wine')
+    wine.add_argument('--provider', choices=['standalone', 'crossover'], required=True)
+    wine.add_argument('--bottle', default='Steam-3')
+    wine.add_argument('--cwd', type=Path)
+    wine.add_argument('arguments', nargs=argparse.REMAINDER)
+    args = parser.parse_args()
+    runtime = ManagedRuntime(args.root)
+    if args.action == 'status':
+        print(json.dumps(runtime.status()))
+    elif args.action == 'install':
+        runtime.install(args.cache)
+        print('Independent Wine runtime installed.')
+    elif args.action == 'prepare':
+        runtime.prepare(args.source_steam)
+        print('Independent Steam prefix prepared.')
+    else:
+        arguments = args.arguments
+        if arguments and arguments[0] == '--':
+            arguments = arguments[1:]
+        if not arguments:
+            parser.error('Wine command is required after --')
+        if args.provider == 'standalone':
+            if not runtime.wine.is_file():
+                raise RuntimeError('Install Wine in the Launch environment tab first')
+            runtime.logs.mkdir(parents=True, exist_ok=True)
+            if args.cwd:
+                os.chdir(args.cwd)
+            os.execve(str(runtime.wine), [str(runtime.wine)] + arguments, runtime.environment())
+        else:
+            wine = Path.home() / 'Applications/CrossOver.app/Contents/SharedSupport/CrossOver/bin/wine'
+            prefix = ['--bottle', args.bottle]
+            if args.cwd:
+                prefix += ['--workdir', 'C:/' + str(STEAM_RELATIVE / 'steamapps/common/assettocorsa').split('drive_c/', 1)[1]]
+            if arguments[0].lower().endswith('.exe'):
+                prefix += ['--cx-app']
+            os.execv(str(wine), [str(wine)] + prefix + arguments)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except Exception as error:
+        print('Runtime error: ' + str(error), file=sys.stderr)
+        sys.exit(1)
