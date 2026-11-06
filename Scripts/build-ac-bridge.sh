@@ -42,3 +42,13 @@ print "Built Bridge/build/moza-display-launcher.exe"
 "$llvm_bin/llvm-dlltool" -m i386:x86-64 -d Bridge/runtime-kernel32.def -l Bridge/build/runtime-kernel32.lib
 "${link[@]}" /Brepro /nodefaultlib /machine:x64 /entry:main /subsystem:console /dynamicbase /nxcompat /out:Bridge/build/moza-runtime-probe.exe Bridge/build/runtime-probe.obj Bridge/build/runtime-kernel32.lib Bridge/build/display-user32.lib
 print "Built Bridge/build/moza-runtime-probe.exe"
+"$llvm_bin/clang" -std=c11 -g -Wall -Wextra -Werror -fsanitize=address,undefined Bridge/tests/test_steam_cef.c -o Bridge/build/test-steam-cef
+Bridge/build/test-steam-cef
+"$llvm_bin/clang" --target=x86_64-pc-windows-msvc -std=c11 -O2 -ffreestanding -fno-builtin -fno-stack-protector -Wall -Wextra -Werror -c Bridge/steam-cef.c -o Bridge/build/steam-cef.obj
+"$llvm_bin/llvm-dlltool" -m i386:x86-64 -d Bridge/steam-cef-kernel32.def -l Bridge/build/steam-cef-kernel32.lib
+"${link[@]}" /Brepro /dll /nodefaultlib /machine:x64 /entry:DllMain /dynamicbase /nxcompat /out:Bridge/build/moza-steam-cef.dll /def:Bridge/steam-cef-exports.def Bridge/build/steam-cef.obj Bridge/build/steam-cef-kernel32.lib
+print "Built Bridge/build/moza-steam-cef.dll"
+
+mkdir -p Bridge/build/cef-check
+"$llvm_bin/clang" --target=x86_64-pc-windows-msvc -std=c11 -O2 -ffreestanding -fno-builtin -fno-stack-protector -Wall -Wextra -Werror -c Bridge/tests/cef-wine-check.c -o Bridge/build/cef-wine-check.obj
+"${link[@]}" /Brepro /nodefaultlib /machine:x64 /entry:main /subsystem:console /dynamicbase /nxcompat /out:Bridge/build/cef-check/steamwebhelper.exe Bridge/build/cef-wine-check.obj Bridge/build/runtime-kernel32.lib

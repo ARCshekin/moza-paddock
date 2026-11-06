@@ -43,3 +43,22 @@ MOZA_AC_RUNTIME=standalone ./Scripts/play-assetto.command
 `python3 Scripts/check-runtime.py` проверяет хеши, архивы, раздельные пути, клонирование и отказ перезаписи на временных фикстурах. Вкладка «Запуск → Проверить графику» запускает небольшой Win64 probe: создание D3D11 hardware device и перечисление мониторов. Он не загружает игру, не входит в Steam и не обращается к рулю.
 
 Проверено на macOS 27.0.1 / Apple M3 Pro: установка из вкладки приложения, создание чистого prefix, независимый APFS-перенос 26 ГБ Assetto Corsa, Wine 11.21, D3D11 feature level 11.0 (`HRESULT=0`), DXVK через bundled MoltenVK и два монитора. Steam прошёл проверку файлов и открыл новую сессию клиента; требуется отдельный вход в аккаунт. Загрузка реального заезда и FFB в этой среде пока не подтверждены.
+
+## Чёрное окно Steam
+
+Одного `-cef-disable-gpu` на этом Mac оказалось недостаточно: устройство D3D11 работало, но Steam оставался чёрным. Независимый Steam теперь получает `-cef-disable-gpu -cef-disable-gpu-compositing` и небольшой собственный адаптер CEF.
+
+`Bridge/steam-cef.c` предоставляет интерфейс WinMM, перенаправляя 189 экспортов к оригинальному `moza_winmm.dll`. Оригинал копируется из закреплённого Wine. В браузерном процессе `steamwebhelper.exe` адаптер заменяет только импорт `GetCommandLineW` в EXE и `libcef.dll`, добавляя `--in-process-gpu` и параметры программной отрисовки. Машинный код WinAPI не переписывается. Дочерние процессы с `--type=` и другие программы не получают изменённой командной строки. EXE Steam и CEF остаются оригинальными, поэтому штатная проверка и обновление клиента сохраняются.
+
+Загрузка настраивается в `HKCU/Software/Wine/AppDefaults/steamwebhelper.exe/DllOverrides`, только в независимом prefix. Перед каждым запуском Steam установщик восстанавливает адаптер после возможного `wineboot`. Исходный Wine WinMM сохраняется под отдельным именем. Для отката при закрытой среде есть `runtime.steam_cef.uninstall(runtime)`.
+
+Основание для исследования: [описание межпроцессного представления CEF и October 2026 Steam](https://gist.github.com/cameronwlewis/a0e2a06b026b4e6537dabb6312378b92), [проект с альтернативным single-process обходом](https://github.com/notpop/steam-on-m1-wine). Код адаптера написан в этом проекте; исходники и бинарники этих обходов не включены.
+
+Проверки: ASan/UBSan для синтетической PE-таблицы импортов и ограничения области действия; в реальном Wine — тестовый `steamwebhelper.exe`, дочерний renderer и другая программа. Все прошли, оригинальный `timeGetTime` успешно перенаправляется. Журнал настоящего CEF подтвердил замену двух импортов; отдельный GPU-процесс перестал создаваться. Пользователь подтвердил появление видимого экрана входа после этого изменения. Вход в аккаунт и сам заезд проверяются следующим этапом.
+
+Дополнительная ручная проверка после подготовки prefix и установки адаптера:
+
+```sh
+python3 Scripts/paddock-runtime.py wine --provider standalone -- "Z:$PWD/Bridge/build/cef-check/steamwebhelper.exe" --expect-browser
+python3 Scripts/paddock-runtime.py wine --provider standalone -- "Z:$PWD/Bridge/build/cef-check/steamwebhelper.exe" --expect-browser --type=renderer
+```

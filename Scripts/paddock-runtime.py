@@ -5,7 +5,7 @@ import json
 import os
 from pathlib import Path
 import sys
-from runtime.managed import ManagedRuntime, DEFAULT_ROOT, STEAM_RELATIVE
+from runtime.managed import ManagedRuntime, DEFAULT_ROOT, STEAM_RELATIVE, application_arguments
 
 
 def main():
@@ -41,6 +41,10 @@ def main():
         if args.provider == 'standalone':
             if not runtime.wine.is_file():
                 raise RuntimeError('Install Wine in the Launch environment tab first')
+            arguments = application_arguments(arguments)
+            if arguments[0].replace('\\', '/').rsplit('/', 1)[-1].lower() == 'steam.exe':
+                from runtime.steam_cef import install as install_steam_cef
+                install_steam_cef(runtime, Path(__file__).resolve().parent.parent / 'Bridge/build/moza-steam-cef.dll')
             runtime.logs.mkdir(parents=True, exist_ok=True)
             if args.cwd:
                 os.chdir(args.cwd)
