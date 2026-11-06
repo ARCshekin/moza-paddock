@@ -2,7 +2,7 @@ import Foundation
 import MozaKit
 
 enum PaddockChecks {
-    static func run() throws {
+    static func run(includeInstalledGame: Bool = true) throws {
         let fm = FileManager.default
         let temp = fm.temporaryDirectory.appendingPathComponent("paddock-check-\(UUID().uuidString)")
         try fm.createDirectory(at: temp, withIntermediateDirectories: true)
@@ -59,9 +59,23 @@ enum PaddockChecks {
         _ = resumed.consume(frame(lap: 1, last: 80_123, best: 80_123), now: 5, context: &session)
         try check(session.laps.count == 1, "resume does not duplicate recorded laps")
         try check(lapText(80_123) == "1:20.123", "lap formatting")
-        let actual = try ContentLibrary.scan(PaddockPaths.current.game)
-        try check(actual.cars.contains { $0.id == "lotus_elise_sc" } && actual.tracks.contains { $0.id == "magione" }, "installed car/track metadata scanning")
-        print("Library: \(actual.cars.count) cars, \(actual.tracks.count) tracks, \(actual.weather.count) weather presets")
+        let fixture = temp.appendingPathComponent("fixture-game")
+        try fm.createDirectory(at: fixture.appendingPathComponent("content/cars/test_car/ui"), withIntermediateDirectories: true)
+        try fm.createDirectory(at: fixture.appendingPathComponent("content/cars/test_car/skins/default"), withIntermediateDirectories: true)
+        try fm.createDirectory(at: fixture.appendingPathComponent("content/tracks/test_track/ui/layout"), withIntermediateDirectories: true)
+        try fm.createDirectory(at: fixture.appendingPathComponent("content/tracks/test_track/layout/ai"), withIntermediateDirectories: true)
+        for file in ["acs.exe", "content/cars/test_car/body.kn5", "content/tracks/test_track/models_layout.ini", "content/tracks/test_track/layout/ai/fast_lane.ai"] {
+            try Data().write(to: fixture.appendingPathComponent(file))
+        }
+        try "{\"name\":\"Fixture Car\",\"brand\":\"Fixture\"}".write(to: fixture.appendingPathComponent("content/cars/test_car/ui/ui_car.json"), atomically: true, encoding: .utf8)
+        try "{\"name\":\"Fixture Layout\",\"length\":\"1000\",\"pitboxes\":\"12\"}".write(to: fixture.appendingPathComponent("content/tracks/test_track/ui/layout/ui_track.json"), atomically: true, encoding: .utf8)
+        let scanned = try ContentLibrary.scan(fixture)
+        try check(scanned.cars.first?.name == "Fixture Car" && scanned.tracks.first?.layouts.first?.id == "layout" && scanned.tracks.first?.layouts.first?.hasAI == true, "fixture car, layout and AI scanning")
+        if includeInstalledGame {
+            let actual = try ContentLibrary.scan(PaddockPaths.current.game)
+            try check(actual.cars.contains { $0.id == "lotus_elise_sc" } && actual.tracks.contains { $0.id == "magione" }, "installed car/track metadata scanning")
+            print("Library: \(actual.cars.count) cars, \(actual.tracks.count) tracks, \(actual.weather.count) weather presets")
+        } else { print("SKIP installed game scan (--without-game)") }
         print("All Paddock checks passed; no live game config or hardware changed.")
     }
 }

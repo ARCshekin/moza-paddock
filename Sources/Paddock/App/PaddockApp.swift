@@ -5,7 +5,7 @@ import SwiftUI
 struct PaddockEntry {
     static func main() {
         if CommandLine.arguments.contains("--self-test") {
-            do { try PaddockChecks.run(); exit(0) }
+            do { try PaddockChecks.run(includeInstalledGame: !CommandLine.arguments.contains("--without-game")); exit(0) }
             catch { fputs("Paddock check failed: \(error)\n", stderr); exit(1) }
         }
         PaddockApplication.main()
