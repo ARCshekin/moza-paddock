@@ -22,6 +22,10 @@ enum PaddockChecks {
         configuration.setup = "magione/test.ini"
         configuration.bindings = ["GEARUP": 14, "GEARDN": 13, "DRS": 2]
         let paths = PaddockPaths(project: PaddockPaths.current.project, bottle: "Steam-3", documentsOverride: temp.appendingPathComponent("Documents"), storeOverride: temp.appendingPathComponent("Store"))
+        var independent = paths; independent.runtime = .standalone
+        try check(independent.bottleURL == paths.store.appendingPathComponent("Prefixes/assetto") && independent.game != paths.game && independent.documents == paths.documents, "runtime switch isolates prefix while preserving Documents")
+        let invocation = WineProcess.arguments(paths: independent, arguments: ["reg", "query", "HKCU\\Software\\Valve\\Steam"])
+        try check(invocation.contains("standalone") && invocation.suffix(3) == ["reg", "query", "HKCU\\Software\\Valve\\Steam"], "Wine arguments retain Windows registry paths without shell interpolation")
         try ConfigurationWriter.write(configuration, paths: paths)
         let cfg = paths.documents.appendingPathComponent("cfg")
         let controls = INI(url: cfg.appendingPathComponent("controls.ini"))

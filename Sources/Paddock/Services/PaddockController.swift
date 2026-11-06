@@ -45,9 +45,11 @@ final class PaddockController: ObservableObject {
     var liveBest: Int? { timing.best }
     @Published var modSource: URL?
     @Published var modPlan: [ModPlanItem] = []
+    @Published var runtime: LaunchRuntime
+    @Published var runtimeStatus: RuntimeStatus?
     @Published var bottle: String
     let pathsBase: PaddockPaths
-    var paths: PaddockPaths { .init(project: pathsBase.project, bottle: bottle) }
+    var paths: PaddockPaths { .init(project: pathsBase.project, bottle: bottle, runtime: runtime, documentsOverride: pathsBase.documentsOverride, storeOverride: pathsBase.storeOverride) }
     var storage: PaddockStorage { .init(directory: paths.store) }
     var car: CarAsset? { library.cars.first { $0.id == configuration.car } }
     var track: TrackAsset? { library.tracks.first { $0.id == configuration.track } }
@@ -79,7 +81,7 @@ final class PaddockController: ObservableObject {
     private var storageBlocked = false
 
     init(paths: PaddockPaths = .current) {
-        pathsBase = paths; bottle = paths.bottle
+        pathsBase = paths; bottle = paths.bottle; runtime = paths.runtime
         do {
             let state = try PaddockStorage(directory: paths.store).load()
             configuration = state.draft; presets = state.presets; sessions = state.sessions; selectedPreset = state.selectedPreset
@@ -108,7 +110,7 @@ final class PaddockController: ObservableObject {
             activeSessionID = session.id
         }
         timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in self?.poll() }
-        reload()
+        refreshRuntimeStatus(); reload()
     }
     deinit { timer?.invalidate(); hid.stop() }
 
@@ -261,6 +263,11 @@ final class PaddockController: ObservableObject {
         operation = "Готовлю заезд…"; persist()
         DispatchQueue.global(qos: .userInitiated).async {
             do {
+                if paths.runtime == .standalone {
+                    let statusData = try Self.command("/usr/bin/python3", [paths.project.appendingPathComponent("Scripts/paddock-runtime.py").path, "--root", paths.store.path, "status"])
+                    let status = try JSONDecoder().decode(RuntimeStatus.self, from: statusData)
+                    guard status.installed, status.prepared, status.gameInstalled else { throw PaddockError("Подготовьте Wine и перенесите игру на вкладке «Запуск».") }
+                }
                 try Self.ensureSteam(paths: paths)
                 try Self.setWheelAngle(snapshot.angle)
                 try ConfigurationWriter.write(snapshot, paths: paths)
@@ -269,7 +276,7 @@ final class PaddockController: ObservableObject {
                 let destination = paths.game.appendingPathComponent("dinput8.dll")
                 let data = try Data(contentsOf: source)
                 if (try? Data(contentsOf: destination)) != data { try data.write(to: destination, options: .atomic) }
-                _ = try Self.command(paths.wine.path, ["--bottle", paths.bottle, "reg", "add", "HKCU\\Software\\Wine\\AppDefaults\\acs.exe\\DllOverrides", "/v", "dinput8", "/t", "REG_SZ", "/d", "native,builtin", "/f"])
+                _ = try Self.wineCommand(paths, ["reg", "add", "HKCU\\Software\\Wine\\AppDefaults\\acs.exe\\DllOverrides", "/v", "dinput8", "/t", "REG_SZ", "/d", "native,builtin", "/f"])
                 // A fresh bridge applies this preset's gain. Hardware effects expire on termination.
                 Self.stopBridges()
                 Thread.sleep(forTimeInterval: 0.25)
@@ -281,6 +288,8 @@ final class PaddockController: ObservableObject {
                         var environment = ProcessInfo.processInfo.environment
                         environment["MOZA_AC_GAIN"] = String(snapshot.gain)
                         environment["MOZA_AC_BOTTLE"] = paths.bottle
+                        environment["MOZA_AC_RUNTIME"] = paths.runtime.rawValue
+                        environment["MOZA_AC_ROOT"] = paths.store.path
                         environment["MOZA_AC_KEEP_VIDEO"] = "1"
                         process.environment = environment
                         let log = paths.store.appendingPathComponent("launcher.log")
@@ -393,7 +402,7 @@ final class PaddockController: ObservableObject {
             guard running else { return false }
             // The client clears ActiveUser on sign-out. Query Wine's live
             // registry, not a potentially unflushed user.reg on disk.
-            guard let data = try? command(paths.wine.path, ["--bottle", paths.bottle, "reg", "query", "HKCU\\Software\\Valve\\Steam\\ActiveProcess", "/v", "ActiveUser"]),
+            guard let data = try? wineCommand(paths, ["reg", "query", "HKCU\\Software\\Valve\\Steam\\ActiveProcess", "/v", "ActiveUser"]),
                   let text = String(data: data, encoding: .utf8),
                   let regex = try? NSRegularExpression(pattern: "REG_DWORD\\s+0x([0-9a-fA-F]+)"),
                   let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
@@ -401,8 +410,7 @@ final class PaddockController: ObservableObject {
             return (UInt64(text[range], radix: 16) ?? 0) != 0
         }
         if loggedIn() { return }
-        let steam = Process(); steam.executableURL = paths.wine
-        steam.arguments = ["--bottle", paths.bottle, "--cx-app", "C:/Program Files (x86)/Steam/steam.exe", "-silent"]
+        let steam = WineProcess.make(paths: paths, arguments: ["C:/Program Files (x86)/Steam/steam.exe", "-silent"])
         steam.standardOutput = FileHandle.nullDevice; steam.standardError = FileHandle.nullDevice
         try steam.run()
         for _ in 0..<25 {

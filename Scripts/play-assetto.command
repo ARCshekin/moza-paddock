@@ -3,10 +3,14 @@ set -eu
 cd "${0:A:h:h}"
 project_dir=$PWD
 bottle=${MOZA_AC_BOTTLE:-Steam-3}
-wine="$HOME/Applications/CrossOver.app/Contents/SharedSupport/CrossOver/bin/wine"
+runtime=${MOZA_AC_RUNTIME:-crossover}
+runtime_root=${MOZA_AC_ROOT:-"$HOME/Library/Application Support/MozaPaddock"}
 game="C:/Program Files (x86)/Steam/steamapps/common/assettocorsa"
 bridge="$project_dir/.build/debug/moza-ac-bridge"
 game_dir="$HOME/Library/Application Support/CrossOver/Bottles/$bottle/drive_c/Program Files (x86)/Steam/steamapps/common/assettocorsa"
+if [[ "$runtime" == standalone ]]; then
+    game_dir="$runtime_root/Prefixes/assetto/drive_c/Program Files (x86)/Steam/steamapps/common/assettocorsa"
+fi
 mkdir -p build
 [[ -x "$bridge" ]] || swift build --product moza-ac-bridge
 [[ -f Bridge/build/moza-display-launcher.exe ]] || ./Scripts/build-ac-bridge.sh
@@ -39,5 +43,6 @@ fi
 printf 'Assetto Corsa + MOZA R5. Игровая отдача %.0f%%, плавное включение за 2 секунды.\n' "$(( ${MOZA_AC_GAIN:-1} * 100 ))"
 print 'Экран: внешний монитор, отдельное окно без рамок на весь экран.'
 print 'Лепестки: левый — вниз, правый — вверх. Начать заезд — кнопка Drive в игре.'
-SteamAppId=244210 SteamGameId=244210 "$wine" --bottle "$bottle" \
-    --workdir "$game" --cx-app "$game/moza-display-launcher.exe"
+SteamAppId=244210 SteamGameId=244210 /usr/bin/python3 "$project_dir/Scripts/paddock-runtime.py" \
+    --root "$runtime_root" wine --provider "$runtime" --bottle "$bottle" \
+    --cwd "$game_dir" -- "$game/moza-display-launcher.exe"

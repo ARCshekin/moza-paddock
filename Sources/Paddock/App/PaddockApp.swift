@@ -31,13 +31,14 @@ final class PaddockDelegate: NSObject, NSApplicationDelegate {
 }
 
 enum PaddockTab: String, CaseIterable, Identifiable {
-    case drive = "Заезд", wheel = "Руль и кнопки", presets = "Пресеты", mods = "Моды", records = "Рекорды"
+    case drive = "Заезд", wheel = "Руль и кнопки", presets = "Пресеты", mods = "Моды", records = "Рекорды", runtime = "Запуск"
     var id: String { rawValue }
     var symbol: String {
-        switch self { case .drive: return "flag.checkered"; case .wheel: return "steeringwheel"; case .presets: return "slider.horizontal.3"; case .mods: return "shippingbox"; case .records: return "stopwatch" }
+        switch self { case .drive: return "flag.checkered"; case .wheel: return "steeringwheel"; case .presets: return "slider.horizontal.3"; case .mods: return "shippingbox"; case .records: return "stopwatch"; case .runtime: return "desktopcomputer" }
     }
     var subtitle: String {
         switch self {
+        case .runtime: return "Wine, Steam и независимый запуск игры"
         case .drive: return "Машина, трасса и условия следующего заезда"
         case .wheel: return "MOZA R5 · живой ввод и назначения"
         case .presets: return "Сохранённые конфигурации для быстрого старта"
@@ -85,6 +86,7 @@ struct PaddockShell: View {
                         case .presets: PresetsView(model: model)
                         case .mods: ModsView(model: model)
                         case .records: RecordsView(model: model)
+                        case .runtime: RuntimeView(model: model)
                         }
                     }.padding(.horizontal, 28).padding(.bottom, 24)
                 }
@@ -142,11 +144,13 @@ struct PaddockShell: View {
                 }
                 Text(model.gameRunning ? "Заезд идёт · внешний экран" : "Готов к следующему заезду").font(.system(size: 10)).foregroundStyle(.secondary)
                 Divider().padding(.vertical, 4)
-                Text("CROSSOVER").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary).tracking(1.5)
+                Text(model.runtime == .crossover ? "CROSSOVER" : "WINE · FREE").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary).tracking(1.5)
+                if model.runtime == .crossover {
                 Picker("Бутылка", selection: $model.bottle) {
                     ForEach(model.bottles, id: \.self) { Text($0).tag($0) }
                 }.labelsHidden().disabled(model.gameRunning || model.operation != nil)
                     .onChange(of: model.bottle) { value in UserDefaults.standard.set(value, forKey: "paddock.bottle"); model.reload() }
+                } else { Text("Независимая среда").font(.caption).foregroundStyle(.secondary) }
                 Button { model.emergencyStop() } label: { Label("Остановить отдачу", systemImage: "stop.circle").font(.system(size: 11)).foregroundStyle(.red.opacity(0.9)) }
                     .buttonStyle(.plain).padding(.top, 8)
             }.padding(12).background(Color.white.opacity(0.025)).clipShape(RoundedRectangle(cornerRadius: 12))
