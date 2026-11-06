@@ -5,3 +5,4 @@ GetProcAddress
 GetStdHandle
 WriteFile
 ExitProcess
+GetCommandLineW

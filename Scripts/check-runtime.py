@@ -8,6 +8,7 @@ import tarfile
 import tempfile
 sys.path.insert(0, str(Path(__file__).parent))
 import runtime.managed as managed
+from runtime.steam_cef import install as install_cef, uninstall as uninstall_cef
 from runtime.managed import ManagedRuntime, checksum, verified_archive, validate_archive, MANIFEST, application_arguments
 
 
@@ -42,7 +43,7 @@ with tempfile.TemporaryDirectory() as folder:
     tar_entry('bundle/Versions/Current', 'A')
     validate_archive(archive)
     print('PASS unsafe tar names/links rejected; framework links accepted')
-    assert application_arguments(['C:/Program Files (x86)/Steam/steam.exe', '-silent'])[-1] == '-cef-disable-gpu'
+    assert '-cef-disable-gpu' in application_arguments(['C:/Program Files (x86)/Steam/steam.exe', '-silent'])
     assert application_arguments(['C:\\Steam\\Steam.exe', '-cef-disable-gpu']).count('-cef-disable-gpu') == 1
     assert application_arguments(['C:/games/acs.exe']) == ['C:/games/acs.exe']
     assert application_arguments(['reg', 'query']) == ['reg', 'query']
@@ -75,6 +76,27 @@ with tempfile.TemporaryDirectory() as folder:
     print('PASS APFS import is independent, scoped and refuses overwrite')
     assert all(s['url'].startswith('https://github.com/') and len(s['sha256']) == 64 and s['license'] for s in MANIFEST.values())
     print('PASS dependency versions checksums and licenses pinned')
+    class FakeRuntime:
+        prefix = root / 'cef-prefix'
+        wine_root = root / 'cef-wine'
+        def __init__(self): self.calls = []
+        def run(self, args, **kwargs): self.calls.append(args)
+    fixture = FakeRuntime()
+    system = fixture.prefix / 'drive_c/windows/system32'; system.mkdir(parents=True)
+    builtin = fixture.wine_root / 'lib/wine/x86_64-windows/winmm.dll'
+    builtin.parent.mkdir(parents=True); builtin.write_bytes(b'original Wine fixture')
+    (system / 'winmm.dll').write_bytes(b'original Wine fixture')
+    shim = root / 'shim.dll'; shim.write_bytes(b'CEF fixture')
+    install_cef(fixture, shim)
+    assert (system / 'winmm.dll').read_bytes() == b'CEF fixture'
+    assert (system / 'moza_winmm.dll').read_bytes() == b'original Wine fixture'
+    assert all('AppDefaults\\steamwebhelper.exe\\DllOverrides' in call[2] for call in fixture.calls)
+    install_cef(fixture, shim)
+    uninstall_cef(fixture)
+    assert (system / 'winmm.dll').read_bytes() == b'original Wine fixture'
+    assert not (fixture.prefix / 'paddock-steam-cef.json').exists()
+    print('PASS Steam-only shim deployment preserves Wine DLL and can roll back')
+
     original_manifest = dict(MANIFEST)
     cache = root / 'cache'; cache.mkdir()
     try:
