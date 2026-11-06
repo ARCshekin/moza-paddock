@@ -42,7 +42,7 @@ MOZA_AC_RUNTIME=standalone ./Scripts/play-assetto.command
 
 `python3 Scripts/check-runtime.py` проверяет хеши, архивы, раздельные пути, клонирование и отказ перезаписи на временных фикстурах. Вкладка «Запуск → Проверить графику» запускает небольшой Win64 probe: создание D3D11 hardware device и перечисление мониторов. Он не загружает игру, не входит в Steam и не обращается к рулю.
 
-Проверено на macOS 27.0.1 / Apple M3 Pro: установка из вкладки приложения, создание чистого prefix, независимый APFS-перенос 26 ГБ Assetto Corsa, Wine 11.21, D3D11 feature level 11.0 (`HRESULT=0`), DXVK через bundled MoltenVK и два монитора. Steam прошёл проверку файлов и открыл новую сессию клиента; требуется отдельный вход в аккаунт. Загрузка реального заезда и FFB в этой среде пока не подтверждены.
+Проверено на macOS 27.0.1 / Apple M3 Pro: установка из вкладки приложения, создание чистого prefix, независимый APFS-перенос 26 ГБ Assetto Corsa, Wine 11.21, D3D11 feature level 11.0 (`HRESULT=0`), DXVK через bundled MoltenVK и два монитора. Steam прошёл проверку файлов, пользователь вошёл в аккаунт. После установки оригинальных D3DX11/D3DCompiler игра загрузила Mercedes GT3 / Spa. Подтверждены отдельное окно 1920×1080 на внешнем экране, живые оси руля/педалей и два игровых FFB-эффекта с передачей силы в R5 примерно на 177 Гц. Субъективное качество отдачи оценивает пользователь.
 
 ## Чёрное окно Steam
 
@@ -54,7 +54,7 @@ MOZA_AC_RUNTIME=standalone ./Scripts/play-assetto.command
 
 Основание для исследования: [описание межпроцессного представления CEF и October 2026 Steam](https://gist.github.com/cameronwlewis/a0e2a06b026b4e6537dabb6312378b92), [проект с альтернативным single-process обходом](https://github.com/notpop/steam-on-m1-wine). Код адаптера написан в этом проекте; исходники и бинарники этих обходов не включены.
 
-Проверки: ASan/UBSan для синтетической PE-таблицы импортов и ограничения области действия; в реальном Wine — тестовый `steamwebhelper.exe`, дочерний renderer и другая программа. Все прошли, оригинальный `timeGetTime` успешно перенаправляется. Журнал настоящего CEF подтвердил замену двух импортов; отдельный GPU-процесс перестал создаваться. Пользователь подтвердил появление видимого экрана входа после этого изменения. Вход в аккаунт и сам заезд проверяются следующим этапом.
+Проверки: ASan/UBSan для синтетической PE-таблицы импортов и ограничения области действия; в реальном Wine — тестовый `steamwebhelper.exe`, дочерний renderer и другая программа. Все прошли, оригинальный `timeGetTime` успешно перенаправляется. Журнал настоящего CEF подтвердил замену двух импортов; отдельный GPU-процесс перестал создаваться. Пользователь подтвердил появление видимого экрана входа после этого изменения. После входа подтверждён запуск игрового заезда.
 
 Дополнительная ручная проверка после подготовки prefix и установки адаптера:
 
@@ -62,3 +62,13 @@ MOZA_AC_RUNTIME=standalone ./Scripts/play-assetto.command
 python3 Scripts/paddock-runtime.py wine --provider standalone -- "Z:$PWD/Bridge/build/cef-check/steamwebhelper.exe" --expect-browser
 python3 Scripts/paddock-runtime.py wine --provider standalone -- "Z:$PWD/Bridge/build/cef-check/steamwebhelper.exe" --expect-browser --type=renderer
 ```
+
+## DirectX для Assetto Corsa
+
+Встроенная Wine `d3dx11_43` не реализует `D3DX11CreateShaderResourceViewFromFileW`; без оригинальной библиотеки игра завершалась при создании первой текстуры. `runtime/directx.py` извлекает `d3dx11_43.dll` и `d3dcompiler_43.dll` x64 из оригинальных June 2010 CAB, которые Steam устанавливает в `Steamworks Shared/_CommonRedist/DirectX/Jun2010` (также поддержан старый каталог внутри игры).
+
+CAB и DLL сверяются с SHA-256 из `directx-manifest.json`; проверяется формат x64 PE. Используется только нужный файл из CAB, без запуска вложенных EXE. CAB и извлечённые DLL остаются локально в `Prerequisites/directx-jun2010`, поэтому после переноса исходный CrossOver можно удалить без потери этих компонентов. Системные DLL CrossOver не копируются. Бинарники Microsoft не включены в репозиторий.
+
+DLL устанавливаются рядом с `acs.exe`, прежние файлы при наличии сохраняются в `Backups/DirectX`. Overrides `native,builtin` задаются только для `acs.exe`. Подготовка prefix устанавливает компоненты из выбранного Steam; перед запуском игры проверяется локальный кеш. При отсутствии оригинальных CAB подготовка объясняет, какой Steam prerequisite нужен.
+
+Источник и условия использования: [Microsoft DirectX End-User Runtimes (June 2010)](https://www.microsoft.com/en-us/download/details.aspx?id=8109). Используются предоставленные с установленной игрой redistributable CAB; это не новый графический backend и не замена DXVK.

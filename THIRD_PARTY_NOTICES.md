@@ -43,3 +43,12 @@ Git or application source releases. Source and build references:
 [Wine](https://gitlab.winehq.org/wine/wine),
 [macOS packages](https://github.com/Gcenx/macOS_Wine_builds),
 [DXVK macOS](https://github.com/Gcenx/DXVK-macOS).
+
+## Game prerequisites
+
+Assetto Corsa requires Microsoft's original June 2010 D3DX11/D3DCompiler
+runtimes. The local installer extracts x64 DLLs from the user's Steam-provided
+redistributable CABs and verifies the hashes in
+[directx-manifest.json](Scripts/runtime/directx-manifest.json). These proprietary
+DLLs/CABs are not included in the repository or covered by this project's MIT
+license. [Official runtime and terms](https://www.microsoft.com/en-us/download/details.aspx?id=8109).

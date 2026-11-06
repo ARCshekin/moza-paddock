@@ -45,6 +45,10 @@ def main():
             if arguments[0].replace('\\', '/').rsplit('/', 1)[-1].lower() == 'steam.exe':
                 from runtime.steam_cef import install as install_steam_cef
                 install_steam_cef(runtime, Path(__file__).resolve().parent.parent / 'Bridge/build/moza-steam-cef.dll')
+            if arguments[0].replace('\\', '/').rsplit('/', 1)[-1].lower() in ('acs.exe', 'moza-display-launcher.exe'):
+                from runtime.directx import install as install_directx
+                source = Path.home() / ('Library/Application Support/CrossOver/Bottles/' + args.bottle) / STEAM_RELATIVE
+                install_directx(runtime, source)
             runtime.logs.mkdir(parents=True, exist_ok=True)
             if args.cwd:
                 os.chdir(args.cwd)

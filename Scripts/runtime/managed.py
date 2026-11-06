@@ -150,6 +150,8 @@ class ManagedRuntime:
             self.import_steam(Path(source_steam))
         if not (self.game / 'acs.exe').is_file():
             raise RuntimeError('Select a Windows Steam folder with Assetto Corsa installed')
+        from .directx import install as install_directx
+        install_directx(self, source_steam)
         # Preserve existing macOS Documents/Assetto Corsa settings via Wine shell folders.
         personal = 'Z:' + str(HOME / 'Documents').replace('/', '\\')
         for key in ('User Shell Folders', 'Shell Folders'):
