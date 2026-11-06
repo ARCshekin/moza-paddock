@@ -1,0 +1,3 @@
+#!/bin/sh
+set -eu
+python3 Scripts/check-commit-message.py "$1"
