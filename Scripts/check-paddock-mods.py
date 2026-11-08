@@ -47,6 +47,32 @@ with tempfile.TemporaryDirectory(prefix="paddock-mod-tests-") as temporary:
         rejected(lambda: mods.operate(archive, game, store, install=True))
     assert target.read_text() == "keep me"
     print("PASS failed installation restores original package")
+    dependencies = root / "car-with-dependencies.zip"
+    with zipfile.ZipFile(dependencies, "w") as z:
+        z.writestr("pack/content/cars/dependency_car/ui/ui_car.json", '{"name":"Dependency car"}')
+        z.writestr("pack/content/cars/dependency_car/body.kn5", "model")
+        z.writestr("pack/content/fonts/rss-font.txt", "new font")
+        z.writestr("pack/apps/lua/RSS_Settings/manifest.ini", "[ABOUT]")
+        z.writestr("pack/apps/lua/RSS_Settings/RSS_Settings.lua", "-- fixture")
+    fonts = game / "content/fonts"; fonts.mkdir(parents=True, exist_ok=True)
+    (fonts / "unrelated.txt").write_text("keep unrelated")
+    (fonts / "rss-font.txt").write_text("old font")
+    plan = mods.operate(dependencies, game, store)
+    assert {x["kind"] for x in plan} == {"cars", "fonts", "apps"}
+    mods.operate(dependencies, game, store, install=True)
+    assert (fonts / "rss-font.txt").read_text() == "new font"
+    assert (fonts / "unrelated.txt").read_text() == "keep unrelated"
+    assert (game / "apps/lua/RSS_Settings/RSS_Settings.lua").is_file()
+    (fonts / "rss-font.txt").write_text("keep font on rollback")
+    copy2 = mods.shutil.copy2
+    def fail_font(source, destination, *args, **kwargs):
+        if Path(destination) == fonts / "rss-font.txt": raise RuntimeError("simulated font failure")
+        return copy2(source, destination, *args, **kwargs)
+    with patch.object(mods.shutil, "copy2", fail_font):
+        rejected(lambda: mods.operate(dependencies, game, store, install=True))
+    assert (fonts / "rss-font.txt").read_text() == "keep font on rollback"
+    assert (fonts / "unrelated.txt").read_text() == "keep unrelated"
+    print("PASS car dependencies include scoped fonts/Lua apps, preserve other fonts and roll back files")
     malicious = root / "bad.zip"
     with zipfile.ZipFile(malicious, "w") as z: z.writestr("../escape", "bad")
     rejected(lambda: mods.operate(malicious, game, store, install=True))

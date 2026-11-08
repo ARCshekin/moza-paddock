@@ -81,7 +81,7 @@ struct ModsView: View {
                     Text(source.lastPathComponent).font(.headline).textSelection(.enabled)
                     ForEach(model.modPlan) { item in
                         HStack {
-                            Image(systemName: item.kind == "cars" ? "car.side" : "road.lanes").frame(width: 22).foregroundStyle(.secondary)
+                            Image(systemName: ["cars": "car.side", "tracks": "road.lanes", "fonts": "textformat", "apps": "app" ][item.kind] ?? "shippingbox").frame(width: 22).foregroundStyle(.secondary)
                             VStack(alignment: .leading, spacing: 4) { Text(item.id).font(.system(size: 13, weight: .medium)); Text(item.destination).font(.caption2).foregroundStyle(.secondary) }
                             Spacer()
                             Text(item.replaces ? "Заменит установленный" : "Новый").font(.caption).foregroundStyle(item.replaces ? Color.orange : Color.green)
