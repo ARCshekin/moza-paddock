@@ -7,6 +7,10 @@
 #define CFB_TEST
 #include "../observe.c"
 
+static int foreground = 1;
+static U32 lastKey, keyCount;
+int test_game_foreground(void) { return foreground; }
+void test_key(U32 key, int down) { lastKey=key; if(down)keyCount++; }
 unsigned char test_shm[SHM_FULL];
 static unsigned char physics[TM_PHYSICS_BYTES];
 const unsigned char *test_physics(void) { return physics; }
@@ -114,6 +118,24 @@ int main(void) {
 
     input(1, 32768, 65535, 65535, 65535, 0, 0);
     assert(CALL(device, 9, HR (*)(Device *, U32, PTR), 272, st) == OK && l[8] == 0);
+
+    /* Extended buttons share a sequence/stamp checked v2 extension. */
+    put32(SHM_IN + 40, 0x101); /* buttons 26 and 34 */
+    put32(SHM_IN + 48, get32(SHM_IN)); put32(SHM_IN + 52, 0x3433424d);
+    put64(SHM_IN + 56, nowMs);
+    assert(CALL(device, 9, HR (*)(Device *, U32, PTR), 272, st) == OK);
+    assert(st[73] == 128 && st[81] == 128 && st[82] == 0);
+    /* Legacy publisher changes its sequence but cannot refresh the extension. */
+    input(1, 32768, 65535, 65535, 0, 0, 8);
+    assert(CALL(device, 9, HR (*)(Device *, U32, PTR), 272, st) == OK);
+    assert(st[73] == 0 && st[81] == 0);
+
+    keyboard_actions(1); assert(lastKey == 0x1b && keyCount == 1);
+    keyboard_actions(1); assert(keyCount == 1);
+    foreground = 0; keyboard_actions(0); keyboard_actions(2); assert(keyCount == 1);
+    foreground = 1; keyboard_actions(2); assert(keyCount == 1);
+    keyboard_actions(0); keyboard_actions(2); assert(lastKey == 0x0d && keyCount == 2);
+    keyboard_actions(0);
 
     /* Constant force on X by offset, Cartesian. */
     U32 axis = 0;

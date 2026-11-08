@@ -59,12 +59,17 @@ final class EffectEngineTests: XCTestCase {
     func testSharedMemoryRoundTrip() throws {
         let path = NSTemporaryDirectory() + "cfb-test-\(UUID().uuidString)/ffb-v2.bin"
         let bridge = try SharedBridge(path: path)
-        var input = BridgeInput(); input.connected = true; input.steering = 1234; input.hat = 2
+        var input = BridgeInput(); input.connected = true; input.steering = 1234; input.hat = 2; input.buttons = (1 << 33) | (1 << 24); input.keyboardActions = 1
         bridge.publish(input, unixMilliseconds: 99)
         let raw = try Data(contentsOf: URL(fileURLWithPath: path))
         XCTAssertEqual(raw.count, 8192)
         XCTAssertEqual(raw[0..<4], Data("CFB2".utf8))
         XCTAssertEqual(raw[64] & 1, 0)
+        XCTAssertEqual(raw[99], 1) // button 25 remains in the legacy low word
+        XCTAssertEqual(raw[105], 1) // button 34 is bit 8 of the extension
+        XCTAssertEqual(raw[108], 1) // Escape action
+        XCTAssertEqual(raw[112], raw[64]) // extension sequence echo
+        XCTAssertEqual(raw[120], 99) // extension timestamp echo
         XCTAssertEqual(raw[80], 0xd2); XCTAssertEqual(raw[81], 0x04)
         XCTAssertEqual(bridge.readForce()?.effects.count, 0)
         XCTAssertNil(bridge.readTelemetry())
