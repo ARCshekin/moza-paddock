@@ -8,3 +8,6 @@ CloseHandle
 GetLastError
 CreateFileW
 WriteFile
+LoadLibraryW
+GetProcAddress
+Sleep
