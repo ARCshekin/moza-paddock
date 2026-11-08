@@ -147,9 +147,11 @@ static int read_snapshot_status(Snapshot *out, U32 *reason) {
     s.buttons = le32(b + 32);
     if (s.buttons & ~0x1ffffffull) { *reason = 7; return 0; }
     s.actions = 0;
-    if (le32(b + 52) == 0x3433424du && le32(b + 48) == s1 && le64(b + 56) == stamp) {
+    U32 extension = le32(b + 52);
+    if ((extension == 0x3433424du || extension == 0x3034424du) && le32(b + 48) == s1 && le64(b + 56) == stamp) {
         U32 extra = le32(b + 40), actions = le32(b + 44);
-        if ((extra & ~0x1ffu) || (actions & ~0x3fu)) { *reason = 7; return 0; }
+        U32 allowed = extension == 0x3034424du ? 0x7fffu : 0x1ffu;
+        if ((extra & ~allowed) || (actions & ~0x3fu)) { *reason = 7; return 0; }
         s.buttons |= (U64)extra << 25;
         s.actions = actions;
     }
@@ -157,7 +159,7 @@ static int read_snapshot_status(Snapshot *out, U32 *reason) {
     s.sequence = s1;
     *reason = 7;
     if (s.axis[0] > 65535 || s.axis[1] > 65535 || s.axis[2] > 65535 || s.axis[3] > 65535 ||
-        (s.buttons & ~0x3ffffffffull) || s.hat > 8)
+        (s.buttons & ~0xffffffffffull) || s.hat > 8)
         return 0;
     *reason = 0;
     *out = s;

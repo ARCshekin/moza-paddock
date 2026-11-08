@@ -31,8 +31,8 @@ enum PaddockChecks {
         configuration.setup = "magione/test.ini"
         configuration.bindings = ["GEARUP": 14, "GEARDN": 13, "DRS": 2]
         configuration.wheelSettings = shaped
-        configuration.bindings["BRIDGE_CLUTCH"] = 34
-        configuration.bindings["BRIDGE_ESCAPE"] = 33
+        configuration.bindings["BRIDGE_CLUTCH"] = 40
+        configuration.bindings["BRIDGE_ESCAPE"] = 39
         configuration.bindings["__EXT_PIT_LIMITER"] = 32
         let paths = PaddockPaths(project: PaddockPaths.current.project, bottle: "Steam-3", documentsOverride: temp.appendingPathComponent("Documents"), storeOverride: temp.appendingPathComponent("Store"))
         var independent = paths; independent.runtime = .standalone
@@ -41,7 +41,7 @@ enum PaddockChecks {
         try check(invocation.contains("standalone") && invocation.suffix(3) == ["reg", "query", "HKCU\\Software\\Valve\\Steam"], "Wine arguments retain Windows registry paths without shell interpolation")
         try ConfigurationWriter.write(configuration, paths: paths)
         let bridgeControls = try JSONDecoder().decode(BridgeControlConfiguration.self, from: Data(contentsOf: paths.store.appendingPathComponent(WheelInputSettings.fileName)))
-        try check(bridgeControls.bindings["BRIDGE_CLUTCH"] == 34 && bridgeControls.actions(pressed: [33]) == 1, "button clutch and Escape reach native bridge configuration")
+        try check(bridgeControls.bindings["BRIDGE_CLUTCH"] == 40 && bridgeControls.actions(pressed: [39]) == 1, "buttons 39 and 40 reach native clutch and Escape configuration")
         let cfg = paths.documents.appendingPathComponent("cfg")
         let controls = INI(url: cfg.appendingPathComponent("controls.ini"))
         let race = INI(url: cfg.appendingPathComponent("race.ini"))
