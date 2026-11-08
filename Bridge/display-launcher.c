@@ -37,6 +37,12 @@ API int CloseHandle(PTR);
 API U32 GetLastError(void);
 API PTR CreateFileW(const U16 *, U32, U32, PTR, U32, U32, PTR);
 API int WriteFile(PTR, const void *, U32, U32 *, PTR);
+API PTR LoadLibraryW(const U16 *);
+API PTR GetProcAddress(PTR, const char *);
+API void Sleep(U32);
+#include "steam-ready.h"
+static unsigned char (*steamInitialize)(void);
+static int initializeSteam(void) { return steamInitialize && steamInitialize() != 0; }
 static PTR logFile;
 static Rect target;
 static int foundMonitor, hasExternal;
@@ -96,6 +102,16 @@ void main(void) {
         CloseHandle(logFile); ExitProcess(4);
     }
     logRect("Selected display: ", target);
+    static const U16 steamName[] = {'.','/','s','t','e','a','m','_','a','p','i','6','4','.','d','l','l',0};
+    PTR steam = LoadLibraryW(steamName);
+    steamInitialize = steam ? (unsigned char (*)(void))GetProcAddress(steam, "SteamAPI_Init") : 0;
+    void (*shutdown)(void) = steam ? (void (*)(void))GetProcAddress(steam, "SteamAPI_Shutdown") : 0;
+    if (!shutdown || !wait_steam_ready(initializeSteam, Sleep, 60)) {
+        logRect("Steam API unavailable; sign in and retry: ", (Rect){0});
+        CloseHandle(logFile); ExitProcess(5);
+    }
+    shutdown();
+    logRect("Steam API ready: ", (Rect){0});
     Startup startup = {0}; Process process = {0};
     startup.size = sizeof(startup);
     startup.flags = 1 | 2 | 4; /* USESHOWWINDOW, USESIZE, USEPOSITION */
