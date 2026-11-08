@@ -23,6 +23,8 @@ jobs:
         run: .build/release/MozaPaddock --self-test --without-game
       - name: Standalone runtime checks
         run: python3 Scripts/check-runtime.py
+      - name: Check isolated CSP fixtures
+        run: python3 Scripts/check-csp.py
       - name: Archive installer checks
         run: python3 Scripts/check-paddock-mods.py
       - name: Bridge checks and Windows helper builds
