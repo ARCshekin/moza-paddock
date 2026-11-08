@@ -76,6 +76,9 @@ final class PaddockController: ObservableObject {
             DispatchQueue.main.async {
                 guard self.setupRequest == request else { return }
                 self.setups = values
+                if !self.configuration.setup.isEmpty && !values.contains(self.configuration.setup) {
+                    self.configuration.setup = ""; self.persist()
+                }
             }
         }
     }
@@ -147,7 +150,6 @@ final class PaddockController: ObservableObject {
         if track == nil, let first = library.tracks.first { configuration.track = first.id }
         if layout == nil { configuration.layout = track?.layouts.first?.id ?? "" }
         if !library.weather.contains(where: { $0.id == configuration.weather }) { configuration.weather = library.weather.first?.id ?? "4_mid_clear" }
-        if !setups.contains(configuration.setup) { configuration.setup = "" }
     }
 
     func persist() {
