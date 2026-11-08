@@ -3,6 +3,8 @@
 import argparse
 from pathlib import Path
 import subprocess
+import json
+import shutil
 import time
 from runtime.steam_cef import install as install_steam_cef
 from runtime.csp_trial import TrialRuntime
@@ -16,8 +18,13 @@ def main():
     parser.add_argument('--car', default='rss_alpine_a525')
     parser.add_argument('--renderer', choices=['dxvk', 'dxmt'], default='dxvk')
     parser.add_argument('--hud', action='store_true')
-    parser.add_argument('--gain', type=float, default=1.0)
+    parser.add_argument('--gain', type=float)
     args = parser.parse_args()
+    if args.gain is None:
+        try:
+            args.gain = float(json.loads((DEFAULT_ROOT / 'paddock.json').read_text())['draft']['gain'])
+        except (OSError, ValueError, KeyError, TypeError):
+            args.gain = 1.0
     if not 0 <= args.gain <= 1:
         parser.error('gain must be between 0 and 1')
     commands = subprocess.check_output(['ps', 'ax', '-o', 'comm='], text=True).splitlines()
@@ -54,6 +61,13 @@ def main():
         write_ini(cfg / 'race.ini', race)
         write_ini(cfg / 'video.ini', video_profile(read_ini(cfg / 'video.ini')))
         project = Path(__file__).resolve().parent.parent
+        for name in ('dinput8.dll', 'moza-display-launcher.exe'):
+            source = project / 'Bridge/build' / name
+            target = game / name
+            if not target.is_file() or source.read_bytes() != target.read_bytes():
+                temporary = target.with_suffix('.new')
+                shutil.copyfile(source, temporary)
+                temporary.replace(target)
         bridge_log = open(project / 'build/ac-bridge-live.log', 'ab')
         bridge = subprocess.Popen([str(project / '.build/debug/moza-ac-bridge'), '--gain', str(args.gain)],
                                   stdout=bridge_log, stderr=subprocess.STDOUT)
