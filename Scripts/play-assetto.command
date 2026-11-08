@@ -14,6 +14,8 @@ fi
 bridge_pid=""
 cleanup_session() {
     local game_status=$?
+    # A duplicate helper must not shut down the prefix owned by the first one.
+    if [[ "$game_status" == 6 ]]; then return "$game_status"; fi
     if [[ -n "$bridge_pid" ]]; then kill -TERM "$bridge_pid" 2>/dev/null || true; fi
     /usr/bin/python3 "$project_dir/Scripts/paddock-runtime.py" --root "$runtime_root" \
         shutdown --provider "$runtime" --bottle "$bottle" || true
