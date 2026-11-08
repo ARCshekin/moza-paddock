@@ -8,3 +8,5 @@ CloseHandle
 GetLastError
 CreateFileW
 WriteFile
+ResumeThread
+TerminateProcess
