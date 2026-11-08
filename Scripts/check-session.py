@@ -31,7 +31,6 @@ print('PASS session cleanup: exact prefix, graceful exit, bounded fallback, no u
 # Exercise the real zsh cleanup function with a harmless sleep process and a
 # fake runtime command. A rejected duplicate must preserve the first session.
 import os
-import shlex
 source = Path(__file__).with_name('play-assetto.command').read_text()
 body = 'cleanup_session() {' + source.split('cleanup_session() {', 1)[1].split('\n}', 1)[0] + '\n}'
 with TemporaryDirectory() as temporary:

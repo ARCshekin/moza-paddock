@@ -21,5 +21,9 @@ int main(void) {
     assert(!retry_startup(1, 0, 10000, 0));
     assert(!retry_startup(99, 0, 1500, 0));
     assert(!retry_startup(0, 0, 1500, 0));
+    assert(launcher_exit_code(6) == 1);
+    assert(launcher_exit_code(0xc0000006u) == 1);
+    assert(launcher_exit_code(99) == 99);
+    assert(launcher_exit_code(0) == 0);
     return 0;
 }
