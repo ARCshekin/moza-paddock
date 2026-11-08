@@ -56,3 +56,8 @@ license. [Official runtime and terms](https://www.microsoft.com/en-us/download/d
 ## Optional Custom Shaders Patch
 
 The optional installer fetches CSP 0.2.11 only from [the author's site](https://acstuff.club/patch/) with a pinned SHA-256 in `Scripts/runtime/csp-manifest.json`. CSP runtime binaries are not included in this repository; upstream terms apply. Car-specific fonts and Lua apps remain part of the user's mod package and are never redistributed by this project.
+
+
+## Optional CSP shader compiler
+
+The diagnostic CSP copy uses Microsoft d3dcompiler_47 from the Windows 8.1 SDK redistributable. The official Microsoft CAB URL, member name and CAB/DLL SHA-256 are pinned in `Scripts/runtime/csp-directx-manifest.json`. Download and extraction are local only; no Microsoft binaries or local macOS/game font files are redistributed.
