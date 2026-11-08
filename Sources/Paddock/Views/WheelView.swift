@@ -10,11 +10,12 @@ struct WheelView: View {
                 liveInput.frame(width: 255)
                 settings.frame(maxWidth: .infinity)
             }
+            WheelTuningView(model: model)
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
                     VStack(alignment: .leading, spacing: 5) {
                         SectionLabel(text: "Назначения кнопок")
-                        Text("Нажмите «Назначить», затем кнопку на руле.").font(.caption).foregroundStyle(.secondary)
+                        Text("Нажмите «Назначить», затем кнопку 1–40 на руле.").font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
                     if model.pendingBinding != nil { Button("Отмена") { model.pendingBinding = nil } }
@@ -23,6 +24,7 @@ struct WheelView: View {
                     HStack(spacing: 12) {
                         Image(systemName: action.symbol).foregroundStyle(.secondary).frame(width: 22)
                         Text(action.name).font(.system(size: 12))
+                        if action.cspOnly { Text("CSP").font(.system(size: 9, weight: .semibold)).foregroundStyle(.orange) }
                         Spacer()
                         if model.pendingBinding == action.id {
                             Text("Нажмите кнопку…").font(.caption).foregroundStyle(PaddockStyle.accent)
@@ -38,7 +40,7 @@ struct WheelView: View {
                     if action.id != ButtonAction.all.last?.id { Divider().opacity(0.4) }
                 }
             }.paddockPanel()
-            Text("Новые назначения и угол применяются при запуске следующего заезда. Одна кнопка назначается одному действию; клавиатурные команды игры сохраняются.")
+            Text("Команды с отметкой CSP требуют CSP; стартер, лимитер автомобиля и RSS-команды также зависят от машины.\nНовые назначения и угол применяются при запуске следующего заезда. Одна кнопка назначается одному действию; клавиатурные команды игры сохраняются.")
                 .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
         }
     }

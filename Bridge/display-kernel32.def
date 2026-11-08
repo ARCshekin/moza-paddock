@@ -8,3 +8,8 @@ CloseHandle
 GetLastError
 CreateFileW
 WriteFile
+LoadLibraryW
+GetProcAddress
+Sleep
+GetTickCount64
+CreateMutexW

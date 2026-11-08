@@ -28,6 +28,9 @@ final class StopFlag: @unchecked Sendable {
 
 func run() throws {
     let bridge = try SharedBridge()
+    let settingsURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/MozaPaddock/" + WheelInputSettings.fileName)
+    let controls = BridgeControlConfiguration.load(url: settingsURL)
+    var clutchValue = 0.0
     let lockFD = open(SharedBridge.defaultPath + ".lock", O_RDWR | O_CREAT | O_NOFOLLOW | O_CLOEXEC, 0o600)
     guard lockFD >= 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
     defer { close(lockFD) }
@@ -65,6 +68,7 @@ func run() throws {
     var lastTime = ProcessInfo.processInfo.systemUptime
     let began = lastTime
     var lastPosition = input.steering()?.normalized ?? 0
+    var filteredSteering = lastPosition
     var velocity = 0.0, lastVelocity = 0.0
     var lastPrint = 0.0, lastPresenceCheck = 0.0
     var gamePID: UInt32 = 0
@@ -89,13 +93,30 @@ func run() throws {
         }
         var snapshot = BridgeInput()
         snapshot.connected = input.steering() != nil
-        snapshot.steering = axis(0x30, fallback: 32768)
+        let rawSteering = axis(0x30, fallback: 32768)
+        let targetSteering = controls.tuning.steering(Double(rawSteering) / 32767.5 - 1)
+        let inputDT = max(0.001, now - lastTime)
+        let smoothing = max(0, min(1, controls.tuning.steeringFilter)) * 0.1
+        filteredSteering += (targetSteering - filteredSteering) * (smoothing == 0 ? 1 : inputDT / (smoothing + inputDT))
+        snapshot.steering = UInt32(max(0, min(65535, ((filteredSteering + 1) * 32767.5).rounded())))
         // R5 SR-P Lite: Z accelerator, Rz brake. DLL presents Y and Rz.
-        snapshot.throttle = axis(0x32, fallback: 65535)
-        snapshot.brake = axis(0x35, fallback: 65535)
-        snapshot.clutch = axis(0x36, fallback: 65535)
-        for button in input.buttons() where (1...25).contains(button) {
-            snapshot.buttons |= 1 << UInt32(button - 1)
+        snapshot.throttle = axis(0x32, fallback: 0)
+        snapshot.brake = axis(0x35, fallback: 0)
+        snapshot.throttle = UInt32((pow(Double(snapshot.throttle) / 65535, max(0.25, min(4, controls.tuning.throttleGamma))) * 65535).rounded())
+        snapshot.brake = UInt32((pow(Double(snapshot.brake) / 65535, max(0.25, min(4, controls.tuning.brakeGamma))) * 65535).rounded())
+        snapshot.clutch = axis(0x36, fallback: 0)
+        let pressed = Set(input.buttons())
+        if let clutchButton = controls.bindings["BRIDGE_CLUTCH"] {
+            if pressed.contains(clutchButton) { clutchValue = 1 }
+            else {
+                let duration = max(0, controls.tuning.clutchReleaseMilliseconds) / 1000
+                clutchValue = duration == 0 ? 0 : max(0, clutchValue - max(0, now - lastTime) / duration)
+            }
+            snapshot.clutch = UInt32((clutchValue * 65535).rounded())
+        }
+        snapshot.keyboardActions = controls.actions(pressed: pressed)
+        for button in input.buttons() where (1...40).contains(button) {
+            snapshot.buttons |= 1 << UInt64(button - 1)
         }
         if let hat = axes.first(where: { $0.usage == 0x39 }) {
             let position = hat.value - hat.logicalMin
@@ -125,7 +146,7 @@ func run() throws {
         peak = max(peak, abs(force)); frames += 1
         if now - lastPrint >= 1 {
             let effects = state?.effects.filter { $0.playing }.count ?? 0
-            print(String(format: "X=%5u gas=%5u brake=%5u buttons=%08x game=%u acquired=%d effects=%d force=%+.3f peak=%.3f rate=%.0fHz",
+            print(String(format: "X=%5u gas=%5u brake=%5u buttons=%016llx game=%u acquired=%d effects=%d force=%+.3f peak=%.3f rate=%.0fHz",
                          snapshot.steering, snapshot.throttle, snapshot.brake, snapshot.buttons,
                          state?.processID ?? 0, state?.acquired == true ? 1 : 0, effects, force, peak,
                          Double(frames) / max(0.001, now - began)))

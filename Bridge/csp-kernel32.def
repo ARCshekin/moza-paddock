@@ -1,0 +1,14 @@
+LIBRARY KERNEL32.dll
+EXPORTS
+LoadLibraryA
+GetModuleHandleA
+GetProcAddress
+GetModuleFileNameW
+CreateFileW
+GetFileSize
+ReadFile
+CloseHandle
+GetProcessHeap
+HeapAlloc
+HeapFree
+WriteFile

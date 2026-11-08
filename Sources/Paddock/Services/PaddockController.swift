@@ -40,6 +40,7 @@ final class PaddockController: ObservableObject {
     var pressed: Set<Int> { live.pressed }
     @Published var pendingBinding: String?
     @Published var gameRunning = false
+    let online = OnlineBrowser()
     let timing = SessionLiveState()
     var liveLap: Int? { timing.current }
     var liveBest: Int? { timing.best }
@@ -56,17 +57,30 @@ final class PaddockController: ObservableObject {
     var layout: TrackLayout? { track?.layouts.first { $0.id == configuration.layout } }
     var activePreset: DrivePreset? { presets.first { $0.id == selectedPreset } }
     var dirty: Bool { activePreset.map { $0.configuration != configuration } ?? true }
-    var currentBest: Int? { sessions.filter { $0.configuration.fingerprint == configuration.fingerprint }.compactMap(\.bestMilliseconds).min() }
+    var currentBest: Int? { sessions.filter { $0.onlineServer == nil && $0.configuration.fingerprint == configuration.fingerprint }.compactMap(\.bestMilliseconds).min() }
     var bottles: [String] {
         let root = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/CrossOver/Bottles")
         return ((try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? []).filter { !$0.hasPrefix(".") }.sorted()
     }
-    var setups: [String] {
+    @Published private(set) var setups: [String] = []
+    private var setupRequest = UUID()
+    func refreshSetups() {
+        let request = UUID(); setupRequest = request
         let root = paths.documents.appendingPathComponent("setups/\(configuration.car)")
-        return [configuration.track, "generic"].flatMap { directory in
-            ((try? FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent(directory).path)) ?? [])
-                .filter { $0.lowercased().hasSuffix(".ini") }.map { "\(directory)/\($0)" }
-        }.sorted()
+        let track = configuration.track
+        DispatchQueue.global(qos: .utility).async {
+            let values = [track, "generic"].flatMap { directory in
+                ((try? FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent(directory).path)) ?? [])
+                    .filter { $0.lowercased().hasSuffix(".ini") }.map { "\(directory)/\($0)" }
+            }.sorted()
+            DispatchQueue.main.async {
+                guard self.setupRequest == request else { return }
+                self.setups = values
+                if !self.configuration.setup.isEmpty && !values.contains(self.configuration.setup) {
+                    self.configuration.setup = ""; self.persist()
+                }
+            }
+        }
     }
     private let hid = MozaHIDInput()
     private var shared: SharedBridge?
@@ -94,7 +108,7 @@ final class PaddockController: ObservableObject {
         if presets.isEmpty {
             let controls = INI(url: paths.documents.appendingPathComponent("cfg/controls.ini"))
             for action in ButtonAction.all {
-                if controls[action.id, "JOY"] == "0", let button = Int(controls[action.id, "BUTTON"]), button >= 0, button < 25 {
+                if controls[action.id, "JOY"] == "0", let button = Int(controls[action.id, "BUTTON"]), button >= 0, button < 40 {
                     configuration.bindings[action.id] = button + 1
                 }
             }
@@ -123,7 +137,7 @@ final class PaddockController: ObservableObject {
             DispatchQueue.main.async {
                 self.operation = nil
                 switch result {
-                case .success(let library): self.library = library; self.normalizeSelection(); self.persist()
+                case .success(let library): self.library = library; self.normalizeSelection(); self.refreshSetups(); self.persist()
                 case .failure(let error): self.error = error.localizedDescription
                 }
             }
@@ -136,7 +150,6 @@ final class PaddockController: ObservableObject {
         if track == nil, let first = library.tracks.first { configuration.track = first.id }
         if layout == nil { configuration.layout = track?.layouts.first?.id ?? "" }
         if !library.weather.contains(where: { $0.id == configuration.weather }) { configuration.weather = library.weather.first?.id ?? "4_mid_clear" }
-        if !setups.contains(configuration.setup) { configuration.setup = "" }
     }
 
     func persist() {
@@ -192,12 +205,12 @@ final class PaddockController: ObservableObject {
         if let action = pendingBinding {
             if Date() > bindingDeadline { pendingBinding = nil; message = "Назначение отменено: кнопка не нажата." }
             else if let button = pressed.subtracting(previousButtons).sorted().first {
-                if button > 25 { error = "Мост поддерживает кнопки 1–25; выберите другую кнопку." }
+                if button > 40 { error = "Мост поддерживает кнопки 1–40; выберите другую кнопку." }
                 else {
                     for (other, assigned) in configuration.bindings where assigned == button && other != action {
                         configuration.bindings.removeValue(forKey: other)
                     }
-                    configuration.bindings[action] = button; message = "Назначена кнопка \(button)."; persist()
+                    configuration.bindings[action] = button; if action == "BRIDGE_CLUTCH" { configuration.autoClutch = false }; message = "Назначена кнопка \(button)."; persist()
                 }
                 pendingBinding = nil
             }
@@ -249,9 +262,23 @@ final class PaddockController: ObservableObject {
         guard results.allSatisfy({ $0.verified == true }) else { throw PaddockError("База не подтвердила угол поворота.") }
     }
 
-    func launch() {
+    func launch(online connection: OnlineConnection? = nil) {
         guard operation == nil else { return }
+        guard launcher?.isRunning != true else { error = "Предыдущий сеанс ещё закрывается. Подождите завершения Steam."; return }
         guard Self.runningGamePIDs().isEmpty else { error = "Заезд уже идёт. Нажмите «Завершить заезд», чтобы выбрать другой."; return }
+        if let connection {
+            do { try connection.validate() } catch { self.error = error.localizedDescription; return }
+            guard connection.server.missingCars(in: library).isEmpty else {
+                error = "Установите все машины сервера, включая машины других участников."; return
+            }
+            guard let (track, layout) = connection.server.installedTrack(in: library),
+                  let asset = library.cars.first(where: { $0.id == connection.car }) else {
+                error = "Установите машину и трассу сервера на вкладке «Моды»."; return
+            }
+            configuration.car = asset.id; configuration.skin = asset.skins.first?.id ?? ""
+            configuration.track = track.id; configuration.layout = layout.id
+            configuration.mode = .practice; configuration.opponents = 0
+        }
         normalizeSelection()
         guard let car, track != nil, let layout else { error = "Выберите установленную машину и трассу."; return }
         if configuration.mode == .race {
@@ -259,7 +286,7 @@ final class PaddockController: ObservableObject {
             configuration.opponents = min(configuration.opponents, max(0, layout.pits - 1))
         }
         let snapshot = configuration, paths = self.paths
-        let context = SessionContext(presetID: selectedPreset, presetName: activePreset?.name ?? "Без пресета", configuration: snapshot, carName: car.name, trackName: layout.name)
+        let context = SessionContext(presetID: selectedPreset, presetName: activePreset?.name ?? "Без пресета", configuration: snapshot, carName: car.name, trackName: layout.name, onlineServer: connection?.server.name)
         operation = "Готовлю заезд…"; persist()
         DispatchQueue.global(qos: .userInitiated).async {
             do {
@@ -268,9 +295,29 @@ final class PaddockController: ObservableObject {
                     let status = try JSONDecoder().decode(RuntimeStatus.self, from: statusData)
                     guard status.installed, status.prepared, status.gameInstalled else { throw PaddockError("Подготовьте Wine и перенесите игру на вкладке «Запуск».") }
                 }
+                if let connection {
+                    let fresh: OnlineServerDetails = try OnlineBrowser.run(paths, ["inspect", "--address", "\(connection.server.host):\(connection.server.httpPort)"])
+                    guard fresh.track == connection.server.track, fresh.racePort == connection.server.racePort,
+                          Set(fresh.cars) == Set(connection.server.cars) else {
+                        throw PaddockError("Конфигурация сервера изменилась. Обновите сервер перед входом.")
+                    }
+                    try OnlineConnection(server: fresh, car: connection.car, player: connection.player, password: connection.password).validate()
+                }
                 try Self.ensureSteam(paths: paths)
                 try Self.setWheelAngle(snapshot.angle)
+                if connection != nil { OnlineConnection.clearCredentials(paths: paths) }
                 try ConfigurationWriter.write(snapshot, paths: paths)
+                if let connection {
+                    let output = try Self.wineCommand(paths, ["reg", "query", "HKCU\\Software\\Valve\\Steam\\ActiveProcess", "/v", "ActiveUser"])
+                    let text = String(decoding: output, as: UTF8.self)
+                    guard let expression = try? NSRegularExpression(pattern: "REG_DWORD\\s+0x([0-9a-fA-F]+)"),
+                          let match = expression.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+                          let range = Range(match.range(at: 1), in: text),
+                          let account = UInt64(text[range], radix: 16), account > 0 else {
+                        throw PaddockError("Войдите в Steam перед подключением.")
+                    }
+                    try connection.write(paths: paths, guid: String(76561197960265728 + account))
+                }
                 // Update game-local DLL only while the simulator is closed.
                 let source = paths.project.appendingPathComponent("Bridge/build/dinput8.dll")
                 let destination = paths.game.appendingPathComponent("dinput8.dll")
@@ -291,16 +338,23 @@ final class PaddockController: ObservableObject {
                         environment["MOZA_AC_RUNTIME"] = paths.runtime.rawValue
                         environment["MOZA_AC_ROOT"] = paths.store.path
                         environment["MOZA_AC_KEEP_VIDEO"] = "1"
+                        environment["MOZA_AC_ONLINE"] = connection == nil ? "0" : "1"
+                        environment["MOZA_AC_DOCUMENTS"] = paths.documents.path
                         process.environment = environment
                         let log = paths.store.appendingPathComponent("launcher.log")
                         if !FileManager.default.fileExists(atPath: log.path) { FileManager.default.createFile(atPath: log.path, contents: nil) }
                         let handle = try FileHandle(forWritingTo: log); try handle.seekToEnd()
                         process.standardOutput = handle; process.standardError = handle
                         process.terminationHandler = { [weak self] process in
+                            if connection != nil { OnlineConnection.clearCredentials(paths: paths) }
                             DispatchQueue.main.async {
                                 guard let self else { return }
                                 if process.terminationStatus != 0 {
-                                    if process.terminationStatus == 99 {
+                                    if process.terminationStatus == 6 {
+                                        self.error = "Другой запуск уже готовит заезд. Дождитесь его завершения."
+                                    } else if process.terminationStatus == 5 {
+                                        self.error = "Steam ещё не готов к запуску игры. Проверьте вход в аккаунт и повторите запуск."
+                                    } else if process.terminationStatus == 99 {
                                         self.error = "Assetto Corsa аварийно завершилась (код 99). Проверьте совместимость выбранного мода. Журнал игры: \(paths.documents.appendingPathComponent("logs/log.txt").path)"
                                     } else {
                                         self.error = "Игра завершилась с кодом \(process.terminationStatus). Проверьте Steam и подключение внешнего экрана. Журнал: \(log.path)"
@@ -319,10 +373,22 @@ final class PaddockController: ObservableObject {
                         self.launcherLog = handle; self.launcher = process
                         try process.run(); self.operation = nil
                         self.message = "Заезд запускается на внешнем экране. Круги будут сохранены в историю автоматически."
-                    } catch { self.operation = nil; self.error = error.localizedDescription; self.finishSession() }
+                    } catch {
+                        self.operation = nil; self.error = error.localizedDescription; self.finishSession()
+                        DispatchQueue.global(qos: .utility).async { Self.closeSession(paths: paths, online: connection != nil) }
+                    }
                 }
-            } catch { DispatchQueue.main.async { self.operation = nil; self.error = error.localizedDescription } }
+            } catch {
+                Self.closeSession(paths: paths, online: connection != nil)
+                DispatchQueue.main.async { self.operation = nil; self.error = error.localizedDescription }
+            }
         }
+    }
+
+    private static func closeSession(paths: PaddockPaths, online: Bool) {
+        if online { OnlineConnection.clearCredentials(paths: paths) }
+        _ = try? command("/usr/bin/python3", [paths.project.appendingPathComponent("Scripts/paddock-runtime.py").path,
+            "--root", paths.store.path, "shutdown", "--provider", paths.runtime.rawValue, "--bottle", paths.bottle])
     }
 
     func stopGame() {

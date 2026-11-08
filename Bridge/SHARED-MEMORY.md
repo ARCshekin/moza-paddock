@@ -47,3 +47,10 @@ The MOZA variant uses `/tmp/moza-ac-<uid>/ffb-v2.bin`. The reserved region at
 +8, u32 Windows PID at +16, 296 bytes of `Local\acpmf_graphics` at +32.
 Readers accept only an even, unchanged sequence. The native Paddock app reads
 this block without publishing wheel input. Existing force/input ABI is unchanged.
+
+
+## 34-button input extension
+
+The original v2 low word at 96 still carries buttons 1–25, and 100 is still the POV. At absolute offsets 104/108 the publisher writes buttons 26–34 (9 bits) and six keyboard action bits (Escape, Enter, Left, Right, Up, Down). The extension is accepted only when 112 echoes the current input sequence, 116 is `MB34`, and 120 echoes the same 64-bit timestamp. Old publishers therefore cannot leave stale extended buttons/actions active. Readers keep accepting legacy snapshots without the extension. The virtual DirectInput device declares 34 buttons; c_dfDIJoystick2 maps them to byte offsets 48–81.
+
+Keyboard events use USER32 only inside Wine, on a rising button edge and only while the foreground window belongs to the game PID. Key-up is sent after 60 ms or on unacquire/input loss; held buttons do not repeat. No macOS keyboard events are generated.

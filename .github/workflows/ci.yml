@@ -23,6 +23,12 @@ jobs:
         run: .build/release/MozaPaddock --self-test --without-game
       - name: Standalone runtime checks
         run: python3 Scripts/check-runtime.py
+      - name: Check isolated CSP fixtures
+        run: python3 Scripts/check-csp.py
+      - name: Session process cleanup checks
+        run: python3 Scripts/check-session.py
+      - name: Online protocol checks
+        run: python3 Scripts/check-online.py
       - name: Archive installer checks
         run: python3 Scripts/check-paddock-mods.py
       - name: Bridge checks and Windows helper builds
@@ -33,9 +39,9 @@ jobs:
           HEAD_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           if [ -n "$BASE" ] && git cat-file -e "$BASE^{commit}" 2>/dev/null; then
-            git log --format=%H "$BASE..$HEAD_COMMIT" > /tmp/paddock-commits
+            git log --no-merges --format=%H "$BASE..$HEAD_COMMIT" > /tmp/paddock-commits
           else
-            git log --format=%H -1 "$HEAD_COMMIT" > /tmp/paddock-commits
+            git log --no-merges --format=%H -1 "$HEAD_COMMIT" > /tmp/paddock-commits
           fi
           while IFS= read -r commit; do
             git show -s --format=%B "$commit" | python3 Scripts/check-commit-message.py

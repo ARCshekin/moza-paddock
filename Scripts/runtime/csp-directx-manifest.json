@@ -1,0 +1,8 @@
+{
+  "version": "Windows 8.1 SDK 6.3.9600.16384",
+  "url": "https://download.microsoft.com/download/B/0/C/B0C80BA3-8AD6-4958-810B-6882485230B5/standalonesdk/Installers/61d57a7a82309cd161a854a6f4619e52.cab",
+  "cabSHA256": "f736e161547095bb8d98c636b85fdfeb4070fefeee3c3745db3ce88f6eb1d9de",
+  "dllSHA256": "e994847e01a6f1e4cbdc5a864616ac262f67ee4f14db194984661a8d927ab7f4",
+  "member": "fil3585cb2ea5db13cc0838f8d06b5c9679",
+  "license": "Microsoft Windows SDK redistributable; download locally, no binary redistribution"
+}
