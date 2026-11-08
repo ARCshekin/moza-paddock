@@ -109,6 +109,8 @@ struct PaddockShell: View {
         .alert("Не удалось выполнить действие", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
             Button("Понятно") { model.error = nil }
         } message: { Text(model.error ?? "") }
+        .onChange(of: model.configuration.car) { _ in model.refreshSetups() }
+        .onChange(of: model.configuration.track) { _ in model.refreshSetups() }
         .onChange(of: model.configuration) { _ in
             saveTask?.cancel()
             let task = DispatchWorkItem { model.persist() }; saveTask = task

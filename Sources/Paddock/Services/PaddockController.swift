@@ -61,12 +61,22 @@ final class PaddockController: ObservableObject {
         let root = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/CrossOver/Bottles")
         return ((try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? []).filter { !$0.hasPrefix(".") }.sorted()
     }
-    var setups: [String] {
+    @Published private(set) var setups: [String] = []
+    private var setupRequest = UUID()
+    func refreshSetups() {
+        let request = UUID(); setupRequest = request
         let root = paths.documents.appendingPathComponent("setups/\(configuration.car)")
-        return [configuration.track, "generic"].flatMap { directory in
-            ((try? FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent(directory).path)) ?? [])
-                .filter { $0.lowercased().hasSuffix(".ini") }.map { "\(directory)/\($0)" }
-        }.sorted()
+        let track = configuration.track
+        DispatchQueue.global(qos: .utility).async {
+            let values = [track, "generic"].flatMap { directory in
+                ((try? FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent(directory).path)) ?? [])
+                    .filter { $0.lowercased().hasSuffix(".ini") }.map { "\(directory)/\($0)" }
+            }.sorted()
+            DispatchQueue.main.async {
+                guard self.setupRequest == request else { return }
+                self.setups = values
+            }
+        }
     }
     private let hid = MozaHIDInput()
     private var shared: SharedBridge?
@@ -123,7 +133,7 @@ final class PaddockController: ObservableObject {
             DispatchQueue.main.async {
                 self.operation = nil
                 switch result {
-                case .success(let library): self.library = library; self.normalizeSelection(); self.persist()
+                case .success(let library): self.library = library; self.normalizeSelection(); self.refreshSetups(); self.persist()
                 case .failure(let error): self.error = error.localizedDescription
                 }
             }
