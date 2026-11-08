@@ -16,6 +16,9 @@ def main():
     sub.add_parser('status')
     csp = sub.add_parser('install-csp')
     csp.add_argument('--archive', type=Path)
+    shutdown = sub.add_parser('shutdown')
+    shutdown.add_argument('--provider', choices=['standalone', 'crossover'], default='standalone')
+    shutdown.add_argument('--bottle', default='Steam-3')
     cleanup = sub.add_parser('cleanup-logs')
     cleanup.add_argument('--wait-game-pid', type=int)
     install = sub.add_parser('install')
@@ -29,7 +32,15 @@ def main():
     wine.add_argument('arguments', nargs=argparse.REMAINDER)
     args = parser.parse_args()
     runtime = ManagedRuntime(args.root)
-    if args.action == 'status':
+    if args.action == 'shutdown':
+        from runtime.session import shutdown
+        if args.provider == 'crossover':
+            runtime.prefix = Path.home() / 'Library/Application Support/CrossOver/Bottles' / args.bottle
+            runtime.wine = Path.home() / 'Applications/CrossOver.app/Contents/SharedSupport/CrossOver/bin/wine'
+        if not shutdown(runtime):
+            raise RuntimeError('Wine session did not finish shutting down')
+        print('Session Steam and Wine processes closed.')
+    elif args.action == 'status':
         print(json.dumps(runtime.status()))
     elif args.action == 'install-csp':
         from runtime.csp import install as install_csp

@@ -251,6 +251,7 @@ final class PaddockController: ObservableObject {
 
     func launch() {
         guard operation == nil else { return }
+        guard launcher?.isRunning != true else { error = "Предыдущий сеанс ещё закрывается. Подождите завершения Steam."; return }
         guard Self.runningGamePIDs().isEmpty else { error = "Заезд уже идёт. Нажмите «Завершить заезд», чтобы выбрать другой."; return }
         normalizeSelection()
         guard let car, track != nil, let layout else { error = "Выберите установленную машину и трассу."; return }
