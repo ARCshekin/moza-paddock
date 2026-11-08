@@ -17,6 +17,10 @@ cleanup_session() {
     if [[ -n "$bridge_pid" ]]; then kill -TERM "$bridge_pid" 2>/dev/null || true; fi
     /usr/bin/python3 "$project_dir/Scripts/paddock-runtime.py" --root "$runtime_root" \
         shutdown --provider "$runtime" --bottle "$bottle" || true
+    if [[ "${MOZA_AC_ONLINE:-0}" == 1 ]]; then
+        /usr/bin/python3 "$project_dir/Scripts/paddock-online.py" clear-session \
+            --documents "${MOZA_AC_DOCUMENTS:-$HOME/Documents/Assetto Corsa}" || true
+    fi
     return "$game_status"
 }
 trap cleanup_session EXIT

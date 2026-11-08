@@ -4,7 +4,7 @@ import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 from unittest.mock import patch
-from online.servers import directory_document, endpoint, inspect
+from online.servers import directory_document, endpoint, inspect, clear_session
 
 item = dict(joinUrl='acmanager://race/online/join?ip=127.0.0.1&httpPort=8081',
             name='Test', track='Magione', players=1, capacity=12, status='Online')
@@ -49,3 +49,13 @@ try:
 finally:
     server.shutdown(); server.server_close(); thread.join()
 print('PASS online: directory decoding, invites, bounded local INFO/JSON, reserved slots and input validation')
+
+from pathlib import Path
+from tempfile import TemporaryDirectory
+with TemporaryDirectory() as root:
+    cfg = Path(root) / 'cfg'; cfg.mkdir()
+    race = cfg / 'race.ini'
+    race.write_text('[REMOTE]\nACTIVE=1\nPASSWORD=secret\nGUID=76561198000000000\n[CAR_0]\nMODEL=test\n')
+    clear_session(root)
+    assert 'secret' not in race.read_text() and 'ACTIVE=0' in race.read_text() and 'MODEL=test' in race.read_text()
+print('PASS online: launcher cleanup survives closing the native UI')
