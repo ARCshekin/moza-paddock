@@ -25,6 +25,8 @@ jobs:
         run: python3 Scripts/check-runtime.py
       - name: Session process cleanup checks
         run: python3 Scripts/check-session.py
+      - name: Online protocol checks
+        run: python3 Scripts/check-online.py
       - name: Archive installer checks
         run: python3 Scripts/check-paddock-mods.py
       - name: Bridge checks and Windows helper builds

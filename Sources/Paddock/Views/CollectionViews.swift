@@ -34,7 +34,7 @@ struct PresetsView: View {
                     }
                     Spacer()
                     VStack(alignment: .trailing, spacing: 5) {
-                        Text(lapText(model.sessions.filter { $0.configuration.fingerprint == preset.configuration.fingerprint }.compactMap(\.bestMilliseconds).min())).font(.system(size: 17, design: .monospaced))
+                        Text(lapText(model.sessions.filter { $0.onlineServer == nil && $0.configuration.fingerprint == preset.configuration.fingerprint }.compactMap(\.bestMilliseconds).min())).font(.system(size: 17, design: .monospaced))
                         Text("лучший круг").font(.caption2).foregroundStyle(.tertiary)
                     }
                     Button("Загрузить") { model.loadPreset(preset) }
@@ -117,7 +117,7 @@ struct RecordsView: View {
     init(model: PaddockController) { self.model = model; timing = model.timing }
     @State private var currentOnly = false
     var filtered: [SessionContext] {
-        model.sessions.filter { !currentOnly || $0.configuration.fingerprint == model.configuration.fingerprint }.sorted { $0.started > $1.started }
+        model.sessions.filter { !currentOnly || $0.onlineServer == nil && $0.configuration.fingerprint == model.configuration.fingerprint }.sorted { $0.started > $1.started }
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -150,7 +150,7 @@ struct SessionRecordCard: View {
         VStack(alignment: .leading, spacing: 15) {
             HStack {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(session.presetName).font(.system(size: 16, weight: .semibold))
+                    Text(session.onlineServer.map { "Онлайн · " + $0 } ?? session.presetName).font(.system(size: 16, weight: .semibold))
                     Text("\(session.carName) · \(session.trackName)").font(.caption).foregroundStyle(.secondary)
                     Text("\(session.configuration.mode.title) · \(session.configuration.angle)° · FFB \(Int(session.configuration.gain * 100))% · \(session.configuration.temperature) °C")
                         .font(.caption2).foregroundStyle(.tertiary)

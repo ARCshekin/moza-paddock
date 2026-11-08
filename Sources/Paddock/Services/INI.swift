@@ -35,6 +35,7 @@ enum ConfigurationWriter {
         let fm = FileManager.default
         let cfg = paths.documents.appendingPathComponent("cfg")
         try fm.createDirectory(at: cfg, withIntermediateDirectories: true)
+        OnlineConnection.clearCredentials(paths: paths)
         let backup = paths.store.appendingPathComponent("Backups/\(UUID().uuidString)")
         try fm.createDirectory(at: backup, withIntermediateDirectories: true)
         for name in ["race.ini", "controls.ini", "video.ini", "assists.ini"] {

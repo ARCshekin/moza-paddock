@@ -31,13 +31,14 @@ final class PaddockDelegate: NSObject, NSApplicationDelegate {
 }
 
 enum PaddockTab: String, CaseIterable, Identifiable {
-    case drive = "Заезд", wheel = "Руль и кнопки", presets = "Пресеты", mods = "Моды", records = "Рекорды", runtime = "Запуск"
+    case drive = "Заезд", online = "Онлайн", wheel = "Руль и кнопки", presets = "Пресеты", mods = "Моды", records = "Рекорды", runtime = "Запуск"
     var id: String { rawValue }
     var symbol: String {
-        switch self { case .drive: return "flag.checkered"; case .wheel: return "steeringwheel"; case .presets: return "slider.horizontal.3"; case .mods: return "shippingbox"; case .records: return "stopwatch"; case .runtime: return "desktopcomputer" }
+        switch self { case .online: return "network"; case .drive: return "flag.checkered"; case .wheel: return "steeringwheel"; case .presets: return "slider.horizontal.3"; case .mods: return "shippingbox"; case .records: return "stopwatch"; case .runtime: return "desktopcomputer" }
     }
     var subtitle: String {
         switch self {
+        case .online: return "Серверы, свободные машины и подключение"
         case .runtime: return "Wine, Steam и независимый запуск игры"
         case .drive: return "Машина, трасса и условия следующего заезда"
         case .wheel: return "MOZA R5 · живой ввод и назначения"
@@ -82,6 +83,7 @@ struct PaddockShell: View {
                     Group {
                         switch tab {
                         case .drive: DriveView(model: model)
+                        case .online: OnlineView(model: model, browser: model.online)
                         case .wheel: WheelView(model: model)
                         case .presets: PresetsView(model: model)
                         case .mods: ModsView(model: model)
@@ -109,6 +111,8 @@ struct PaddockShell: View {
         .alert("Не удалось выполнить действие", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
             Button("Понятно") { model.error = nil }
         } message: { Text(model.error ?? "") }
+        .onChange(of: model.configuration.car) { _ in model.refreshSetups() }
+        .onChange(of: model.configuration.track) { _ in model.refreshSetups() }
         .onChange(of: model.configuration) { _ in
             saveTask?.cancel()
             let task = DispatchWorkItem { model.persist() }; saveTask = task
