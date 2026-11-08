@@ -61,3 +61,8 @@ The optional installer fetches CSP 0.2.11 only from [the author's site](https://
 ## Optional CSP shader compiler
 
 The diagnostic CSP copy uses Microsoft d3dcompiler_47 from the Windows 8.1 SDK redistributable. The official Microsoft CAB URL, member name and CAB/DLL SHA-256 are pinned in `Scripts/runtime/csp-directx-manifest.json`. Download and extraction are local only; no Microsoft binaries or local macOS/game font files are redistributed.
+
+
+## Optional isolated Metal trial
+
+WineSikarugir WS12WineSikarugir10.0_6 uses Wine LGPL-2.1-or-later, with component-specific dependency licenses. DXMT v0.80 is the last MIT-licensed upstream release. URLs, versions, sources and SHA-256 are in `Scripts/runtime/csp-metal-manifest.json`. Packages are downloaded locally; binaries and Steam credentials are never included in the repository. See https://github.com/3Shain/dxmt/releases/tag/v0.80 and https://github.com/Sikarugir-App/Engines/releases/tag/v1.0.

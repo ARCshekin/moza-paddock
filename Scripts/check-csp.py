@@ -5,10 +5,18 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 import struct
 from runtime.csp_symbols import generate
+from runtime.csp_trial import TrialRuntime
+from runtime.managed import ManagedRuntime
 from runtime.csp_performance import apply, read_ini, video_profile
 
 with TemporaryDirectory() as temporary:
     root = Path(temporary)
+    default = ManagedRuntime(root)
+    trial = TrialRuntime(root)
+    assert trial.prefix != default.prefix and trial.wine != default.wine and trial.game != default.game
+    assert trial.environment()['WINEPREFIX'] == str(trial.prefix)
+    assert trial.documents == root / 'Trials/Documents/Assetto Corsa'
+    print('PASS trial prefix, engine, library and Documents are separate from the default runtime')
     public = '\n'.join(f'S_PUB32 [size = 48] `?test{i}@@3HA`\n flags = none, addr = 0001:{i*4}' for i in range(1001))
     responses = {'-summary': 'GUID: {9BEE7421-88FE-47C4-B56C-15496409A8DE}',
                  '-section-headers': '1000 virtual address', '-publics': public,

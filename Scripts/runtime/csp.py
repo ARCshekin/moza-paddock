@@ -12,7 +12,7 @@ from .managed import checksum
 MANIFEST = json.loads(Path(__file__).with_name('csp-manifest.json').read_text())
 
 
-def install(runtime, archive=None):
+def install(runtime, archive=None, configure=True):
     # No shader/runtime DLL replacement while a simulator process is running.
     commands = subprocess.check_output(['/bin/ps', 'ax', '-o', 'command='], text=True).splitlines()
     if any(c.strip().lower() == 'acs.exe' or c.strip().lower().endswith(('/acs.exe', '\\acs.exe')) for c in commands):
@@ -56,7 +56,7 @@ def install(runtime, archive=None):
                 completed.append((target, had_old))
                 if (stage / name).is_dir(): shutil.copytree(stage / name, target, dirs_exist_ok=True)
                 else: shutil.copy2(stage / name, target)
-            runtime.run(['reg', 'add', 'HKCU\\Software\\Wine\\AppDefaults\\acs.exe\\DllOverrides',
+            if configure: runtime.run(['reg', 'add', 'HKCU\\Software\\Wine\\AppDefaults\\acs.exe\\DllOverrides',
                          '/v', 'dwrite', '/t', 'REG_SZ', '/d', 'native,builtin', '/f'], timeout=30)
         except Exception:
             for target, had_old in reversed(completed):
