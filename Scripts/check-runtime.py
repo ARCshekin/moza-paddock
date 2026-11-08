@@ -12,6 +12,8 @@ import tempfile
 sys.path.insert(0, str(Path(__file__).parent))
 import runtime.managed as managed
 import runtime.directx as directx
+import runtime.csp as csp
+import zipfile
 from runtime.steam_cef import install as install_cef, uninstall as uninstall_cef
 from runtime.managed import ManagedRuntime, checksum, verified_archive, validate_archive, MANIFEST, application_arguments
 
@@ -126,6 +128,28 @@ with tempfile.TemporaryDirectory() as folder:
         rejected(lambda: directx.install(fixture, source_steam))
     assert existing.read_bytes() == bytes(pe)
     print('PASS DirectX hashes, x64 extraction, backup, cache and acs-only overrides')
+    csp_archive = root / 'csp-fixture.zip'
+    with zipfile.ZipFile(csp_archive, 'w') as z:
+        z.writestr('dwrite.dll', bytes(pe))
+        z.writestr('extension/config/default.ini', '[FIXTURE]')
+    (fixture.game / 'dwrite.dll').write_bytes(b'old proxy DLL')
+    (fixture.game / 'extension/config').mkdir(parents=True)
+    (fixture.game / 'extension/config/user.ini').write_text('preserved')
+    fake_manifest = dict(csp.MANIFEST, sha256=checksum(csp_archive))
+    with patch.object(csp, 'MANIFEST', fake_manifest), patch.object(csp.subprocess, 'check_output', return_value=''):
+        installed = csp.install(fixture, csp_archive)
+        assert (fixture.game / 'dwrite.dll').read_bytes() == bytes(pe)
+        assert (fixture.game / 'extension/config/user.ini').read_text() == 'preserved'
+        assert (Path(installed['backup']) / 'dwrite.dll').read_bytes() == b'old proxy DLL'
+        (fixture.game / 'dwrite.dll').write_bytes(b'restore on failure')
+        with patch.object(fixture, 'run', side_effect=RuntimeError('simulated registry error')):
+            rejected(lambda: csp.install(fixture, csp_archive))
+        assert (fixture.game / 'dwrite.dll').read_bytes() == b'restore on failure'
+        assert (fixture.game / 'extension/config/user.ini').read_text() == 'preserved'
+        with patch.object(csp.subprocess, 'check_output', return_value='acs.exe'):
+            rejected(lambda: csp.install(fixture, csp_archive))
+    print('PASS CSP pinned install, extension merge, backups, rollback and running-game exclusion')
+
 
 
     original_manifest = dict(MANIFEST)

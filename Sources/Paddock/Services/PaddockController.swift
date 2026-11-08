@@ -300,7 +300,11 @@ final class PaddockController: ObservableObject {
                             DispatchQueue.main.async {
                                 guard let self else { return }
                                 if process.terminationStatus != 0 {
-                                    self.error = "Игра завершилась с кодом \(process.terminationStatus). Проверьте Steam и подключение внешнего экрана. Журнал: \(log.path)"
+                                    if process.terminationStatus == 99 {
+                                        self.error = "Assetto Corsa аварийно завершилась (код 99). Проверьте совместимость выбранного мода. Журнал игры: \(paths.documents.appendingPathComponent("logs/log.txt").path)"
+                                    } else {
+                                        self.error = "Игра завершилась с кодом \(process.terminationStatus). Проверьте Steam и подключение внешнего экрана. Журнал: \(log.path)"
+                                    }
                                 }
                                 if self.activeSessionID == context.id { self.finishSession() }
                                 guard self.launcher === process else { return }

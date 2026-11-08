@@ -140,7 +140,29 @@ def discover(root, game):
             candidates[key] = {"id": identity, "kind": kind, "source": str(package),
                                "destination": key, "replaces": (game / destination).exists()}
     if not candidates:
-        raise ValueError("Не найдены полноценные автомобили или трассы. Пакеты скинов, CSP и приложения пока не поддерживаются.")
+        raise ValueError("Не найдены полноценные автомобили или трассы. Отдельные пакеты скинов, CSP и приложений не поддерживаются.")
+    # Dependencies are accepted only beside a recognized content/cars or
+    # content/tracks package, never by scanning arbitrary nested directories.
+    package_roots = set()
+    for item in candidates.values():
+        package = Path(item["source"])
+        if package.parent.name.lower() in ("cars", "tracks") and package.parent.parent.name.lower() == "content":
+            package_roots.add(package.parent.parent.parent)
+    for package_root in sorted(package_roots):
+        fonts = package_root / "content/fonts"
+        if fonts.is_dir():
+            for source in sorted(fonts.iterdir()):
+                if source.is_file() and source.suffix.lower() in (".png", ".txt", ".ttf", ".otf"):
+                    destination = Path("content/fonts") / source.name
+                    candidates[str(destination)] = {"id": source.name, "kind": "fonts", "source": str(source),
+                        "destination": str(destination), "replaces": (game / destination).exists()}
+        apps = package_root / "apps/lua"
+        if apps.is_dir():
+            for source in sorted(apps.iterdir()):
+                if source.is_dir() and (source / "manifest.ini").is_file() and any(source.glob("*.lua")):
+                    destination = Path("apps/lua") / source.name
+                    candidates[str(destination)] = {"id": source.name, "kind": "apps", "source": str(source),
+                        "destination": str(destination), "replaces": (game / destination).exists()}
     return list(candidates.values())
 
 
@@ -177,11 +199,13 @@ def operate(source, game, store, install=False):
                         current = (target, saved, True)
                     else:
                         current = (target, saved, False)
-                    shutil.copytree(item["source"], target)
+                    if Path(item["source"]).is_dir(): shutil.copytree(item["source"], target)
+                    else: shutil.copy2(item["source"], target)
                     completed.append(current); current = None
             except Exception:
                 for target, saved, had_old in ([current] if current else []) + list(reversed(completed)):
-                    if target.exists(): shutil.rmtree(target)
+                    if target.is_dir(): shutil.rmtree(target)
+                    elif target.exists(): target.unlink()
                     if had_old: shutil.move(str(saved), str(target))
                 raise
             manifest = {"source": str(source), "items": [{k: v for k, v in x.items() if k != "source"} for x in items]}
