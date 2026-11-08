@@ -14,6 +14,8 @@ def main():
     parser.add_argument('--root', type=Path, default=DEFAULT_ROOT)
     sub = parser.add_subparsers(dest='action', required=True)
     sub.add_parser('status')
+    csp = sub.add_parser('install-csp')
+    csp.add_argument('--archive', type=Path)
     cleanup = sub.add_parser('cleanup-logs')
     cleanup.add_argument('--wait-game-pid', type=int)
     install = sub.add_parser('install')
@@ -29,6 +31,9 @@ def main():
     runtime = ManagedRuntime(args.root)
     if args.action == 'status':
         print(json.dumps(runtime.status()))
+    elif args.action == 'install-csp':
+        from runtime.csp import install as install_csp
+        print(json.dumps(install_csp(runtime, args.archive)))
     elif args.action == 'cleanup-logs':
         import time
         from runtime.logfiles import trim_launcher
