@@ -129,4 +129,5 @@ void *memset(void *p, int value, U64 n) {
 #endif
 #include "shm.h"
 #include "virtual_abi.h"
+#include "keyboard.h"
 #include "virtual_core.h"

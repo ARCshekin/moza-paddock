@@ -94,7 +94,7 @@ final class PaddockController: ObservableObject {
         if presets.isEmpty {
             let controls = INI(url: paths.documents.appendingPathComponent("cfg/controls.ini"))
             for action in ButtonAction.all {
-                if controls[action.id, "JOY"] == "0", let button = Int(controls[action.id, "BUTTON"]), button >= 0, button < 25 {
+                if controls[action.id, "JOY"] == "0", let button = Int(controls[action.id, "BUTTON"]), button >= 0, button < 34 {
                     configuration.bindings[action.id] = button + 1
                 }
             }
@@ -192,12 +192,12 @@ final class PaddockController: ObservableObject {
         if let action = pendingBinding {
             if Date() > bindingDeadline { pendingBinding = nil; message = "Назначение отменено: кнопка не нажата." }
             else if let button = pressed.subtracting(previousButtons).sorted().first {
-                if button > 25 { error = "Мост поддерживает кнопки 1–25; выберите другую кнопку." }
+                if button > 34 { error = "Мост поддерживает кнопки 1–34; выберите другую кнопку." }
                 else {
                     for (other, assigned) in configuration.bindings where assigned == button && other != action {
                         configuration.bindings.removeValue(forKey: other)
                     }
-                    configuration.bindings[action] = button; message = "Назначена кнопка \(button)."; persist()
+                    configuration.bindings[action] = button; if action == "BRIDGE_CLUTCH" { configuration.autoClutch = false }; message = "Назначена кнопка \(button)."; persist()
                 }
                 pendingBinding = nil
             }
@@ -251,6 +251,7 @@ final class PaddockController: ObservableObject {
 
     func launch() {
         guard operation == nil else { return }
+        guard launcher?.isRunning != true else { error = "Предыдущий сеанс ещё закрывается. Подождите завершения Steam."; return }
         guard Self.runningGamePIDs().isEmpty else { error = "Заезд уже идёт. Нажмите «Завершить заезд», чтобы выбрать другой."; return }
         normalizeSelection()
         guard let car, track != nil, let layout else { error = "Выберите установленную машину и трассу."; return }

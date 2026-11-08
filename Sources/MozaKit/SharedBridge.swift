@@ -58,7 +58,8 @@ public struct BridgeInput: Sendable, Equatable {
     public var throttle: UInt32 = 65535
     public var brake: UInt32 = 65535
     public var clutch: UInt32 = 65535
-    public var buttons: UInt32 = 0
+    public var buttons: UInt64 = 0
+    public var keyboardActions: UInt32 = 0
     public var hat: UInt32 = 8 // 0...7 clockwise from north, 8 neutral
     public init() {}
 }
@@ -106,8 +107,13 @@ public final class SharedBridge: @unchecked Sendable {
         cfb_store32_relaxed(block + 20, min(value.throttle, 65535))
         cfb_store32_relaxed(block + 24, min(value.brake, 65535))
         cfb_store32_relaxed(block + 28, min(value.clutch, 65535))
-        cfb_store32_relaxed(block + 32, value.buttons & 0x01ff_ffff)
+        cfb_store32_relaxed(block + 32, UInt32(truncatingIfNeeded: value.buttons & 0x01ff_ffff))
         cfb_store32_relaxed(block + 36, min(value.hat, 8))
+        cfb_store32_relaxed(block + 40, UInt32(truncatingIfNeeded: value.buttons >> 25) & 0x1ff)
+        cfb_store32_relaxed(block + 44, value.keyboardActions & 0x3f)
+        cfb_store32_relaxed(block + 48, inputSequence &+ 1)
+        cfb_store32_relaxed(block + 52, 0x3433_424d) // MB34
+        cfb_store64_relaxed(block + 56, unixMilliseconds)
         cfb_fence()
         inputSequence &+= 1 // even: consistent
         cfb_store32_release(block, inputSequence)

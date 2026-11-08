@@ -124,8 +124,10 @@ typedef struct {
 typedef struct {
     U32 offset, source, width;
 } Mapping;
-#define SRC_ZERO 30u
-#define SRC_NOPOV 31u
+#define BUTTON_COUNT 34u
+#define SOURCE_COUNT (5u + BUTTON_COUNT)
+#define SRC_ZERO SOURCE_COUNT
+#define SRC_NOPOV (SOURCE_COUNT + 1u)
 struct Device {
     const DeviceVT *v;
     U32 refs;
@@ -137,7 +139,7 @@ struct Device {
     U32 deadzone[4], saturation[4], calibration[4], gain, autocenter;
     U32 diagSeen, diagResult[16], diagProperty;
     U64 diagAt[16];
-    U32 last[30], seen;
+    U32 last[SOURCE_COUNT], seen;
     U64 lastSequence;
     DeviceEvent queue[128];
     Effect *effects[32];
@@ -157,7 +159,7 @@ static int diagnostic(Device *d, U32 slot, const char *method, HR result) {
     return 0;
 }
 /* Sources: 0 X steering, 1 Y throttle, 2 Rz brake, 3 Slider0 clutch, 4 POV,
- * 5..29 buttons. This matches what the Logitech Windows driver exposes. */
+ * 5..38 buttons. This matches what the Logitech Windows driver exposes. */
 static const GUID *sourceGuid(U32 s) {
     return s == 0   ? &guidX
            : s == 1 ? &guidY
@@ -254,7 +256,7 @@ static HR caps(Device *d, Caps *p) {
                (read_snapshot(&snapshot) ? 1u : 0u);
     p->type = DEVICE_TYPE;
     p->axes = 4;
-    p->buttons = 25;
+    p->buttons = BUTTON_COUNT;
     p->povs = 1;
     p->sample = 1000;
     p->resolution = 1000;
@@ -265,7 +267,7 @@ static HR objects(Device *d, PTR cb, PTR context, U32 flags) {
     if (!cb)
         return INVALID;
     da(d);
-    for (U32 s = 0; s < 30; s++) {
+    for (U32 s = 0; s < SOURCE_COUNT; s++) {
         U32 type = sourceType(s);
         if ((flags & 0xff) && !(flags & type & 0xff))
             continue;
@@ -295,7 +297,7 @@ static HR objects(Device *d, PTR cb, PTR context, U32 flags) {
 }
 /* how: 1 by offset, 2 by ID, 3 by usage (MAKELONG(usage, page)). */
 static int find_source(Device *d, U32 obj, U32 how) {
-    for (U32 s = 0; s < 30; s++) {
+    for (U32 s = 0; s < SOURCE_COUNT; s++) {
         if (how == 1 && mappedOffset(d, s) == obj)
             return (int)s;
         if (how == 2 && ((sourceType(s) >> 8) & 0xffff) == ((obj >> 8) & 0xffff) && (sourceType(s) & obj & 0xff))
@@ -417,14 +419,14 @@ static HR format_work(Device *d, const DataFormat *f, Mapping *proposed) {
     if (!f || f->size != sizeof(*f) || f->objectSize != sizeof(ObjectFormat) || f->dataSize > 4096 ||
         !f->dataSize || f->count > 512 || (f->count && !f->objects) || (f->flags & ~3u))
         return INVALID;
-    unsigned char used[30] = {0};
+    unsigned char used[SOURCE_COUNT] = {0};
     U32 count = 0;
     for (U32 i = 0; i < f->count; i++) {
         ObjectFormat *o = &f->objects[i];
         U32 kind = o->type & 0xff, width = (kind & DIDFT_BUTTON) ? 1 : 4;
         U32 aspect = o->flags & 0xf00;
         int found = -1;
-        for (U32 s = 0; s < 30 && (!aspect || aspect == 0x100); s++) {
+        for (U32 s = 0; s < SOURCE_COUNT && (!aspect || aspect == 0x100); s++) {
             if (used[s])
                 continue;
             U32 t = sourceType(s);
@@ -490,6 +492,7 @@ static HR acquire(Device *d) {
     return OK;
 }
 static HR unacquire(Device *d) {
+    keyboard_reset();
     int was = d->acquired;
     stop_effects(d);
     d->acquired = 0;
@@ -518,12 +521,12 @@ static U32 scaled(Device *d, const Snapshot *s, U32 a) {
     long long span = (long long)d->max[a] - d->min[a];
     return (U32)((long long)d->min[a] + raw * span / 65535);
 }
-static void values(Device *d, const Snapshot *s, U32 out[30]) {
+static void values(Device *d, const Snapshot *s, U32 out[SOURCE_COUNT]) {
     for (U32 i = 0; i < 4; i++)
         out[i] = scaled(d, s, i);
     out[4] = s->hat == 8 ? 0xffffffffu : s->hat * 4500;
-    for (U32 i = 5; i < 30; i++)
-        out[i] = (s->buttons & (1u << (i - 5))) ? 128 : 0;
+    for (U32 i = 5; i < SOURCE_COUNT; i++)
+        out[i] = (s->buttons & (1ull << (i - 5))) ? 128 : 0;
 }
 static void heartbeat(void) {
     volatile unsigned char *p = shm_map();
@@ -532,7 +535,7 @@ static void heartbeat(void) {
         copy_telemetry(p);
     }
 }
-static HR sample(Device *d, U32 out[30]) {
+static HR sample(Device *d, U32 out[SOURCE_COUNT]) {
     if (!d->acquired)
         return NOTACQUIRED;
     Snapshot s;
@@ -540,17 +543,19 @@ static HR sample(Device *d, U32 out[30]) {
     if (!read_snapshot_status(&s, &snapshotReason)) {
         diagnostic(d, 14, "Snapshot_failure_reason", (HR)snapshotReason);
         d->acquired = 0;
+        keyboard_reset();
         stop_effects(d);
         publish(d);
         d->queueHead = d->queueCount = 0;
         return INPUTLOST;
     }
+    keyboard_actions(s.actions);
     heartbeat();
     values(d, &s, out);
     if (d->seen && s.sequence != d->lastSequence && d->bufferSize) {
         for (U32 i = 0; i < d->mapCount; i++) {
             Mapping *m = &d->maps[i];
-            if (m->source >= 30 || out[m->source] == d->last[m->source])
+            if (m->source >= SOURCE_COUNT || out[m->source] == d->last[m->source])
                 continue;
             if (d->queueCount == d->bufferSize) {
                 d->queueHead = (d->queueHead + 1) % 128;
@@ -569,7 +574,7 @@ static HR sample(Device *d, U32 out[30]) {
 }
 /* Write only through the format accepted from this caller. Missing objects
  * stay zero (buffer is cleared first); missing POVs read centered (-1). */
-static void write_state(Device *d, U32 size, PTR out, const U32 data[30]) {
+static void write_state(Device *d, U32 size, PTR out, const U32 data[SOURCE_COUNT]) {
     zero(out, size);
     for (U32 i = 0; i < d->mapCount; i++) {
         Mapping *m = &d->maps[i];
@@ -588,8 +593,8 @@ static HR state(Device *d, U32 size, PTR out) {
         return NOTINITIALIZED;
     if (size != d->formatSize)
         return INVALID;
-    Snapshot neutral = {{32768, 65535, 65535, 65535}, 0, 8, 0};
-    U32 data[30];
+    Snapshot neutral = {{32768, 65535, 65535, 65535}, 0, 8, 0, 0};
+    U32 data[SOURCE_COUNT];
     values(d, &neutral, data);
     write_state(d, size, out, data);
     HR hr = sample(d, data);
@@ -599,7 +604,7 @@ static HR state(Device *d, U32 size, PTR out) {
     return OK;
 }
 static HR poll(Device *d) {
-    U32 data[30];
+    U32 data[SOURCE_COUNT];
     return sample(d, data);
 }
 static HR data(Device *d, U32 bytes, DeviceEvent *out, U32 *count, U32 flags) {
@@ -611,7 +616,7 @@ static HR data(Device *d, U32 bytes, DeviceEvent *out, U32 *count, U32 flags) {
         return INVALID;
     if (!d->bufferSize)
         return NOTBUFFERED;
-    U32 v[30];
+    U32 v[SOURCE_COUNT];
     HR hr = sample(d, v);
     if (hr)
         return hr;
