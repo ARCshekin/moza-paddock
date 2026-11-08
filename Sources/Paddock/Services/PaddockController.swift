@@ -336,6 +336,8 @@ final class PaddockController: ObservableObject {
                         environment["MOZA_AC_RUNTIME"] = paths.runtime.rawValue
                         environment["MOZA_AC_ROOT"] = paths.store.path
                         environment["MOZA_AC_KEEP_VIDEO"] = "1"
+                        environment["MOZA_AC_ONLINE"] = connection == nil ? "0" : "1"
+                        environment["MOZA_AC_DOCUMENTS"] = paths.documents.path
                         process.environment = environment
                         let log = paths.store.appendingPathComponent("launcher.log")
                         if !FileManager.default.fileExists(atPath: log.path) { FileManager.default.createFile(atPath: log.path, contents: nil) }

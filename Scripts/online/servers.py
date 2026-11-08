@@ -94,3 +94,25 @@ def inspect(address):
                 track=track, cars=cars, free=free, clients=int(info.get('clients', 0)),
                 capacity=int(info.get('maxclients', 0)), password=bool(info.get('pass', False)),
                 pickup=bool(info.get('pickup', False)), csp=csp, latency=latency)
+
+
+def clear_session(documents):
+    """Clear only transient REMOTE fields, preserving the rest of the game's INI."""
+    from pathlib import Path
+    path = Path(documents) / 'cfg/race.ini'
+    if not path.is_file():
+        return
+    output = []
+    section = ''
+    for line in path.read_text().splitlines(keepends=True):
+        match = re.fullmatch(r'\s*\[([^\]]+)\]\s*', line.strip())
+        if match:
+            section = match[1]
+        if section == 'REMOTE' and '=' in line:
+            key = line.split('=', 1)[0].strip()
+            if key in ('PASSWORD', 'GUID', 'ACTIVE'):
+                line = key + '=' + ('0' if key == 'ACTIVE' else '') + '\n'
+        output.append(line)
+    temporary = path.with_suffix('.moza-cleanup')
+    temporary.write_text(''.join(output))
+    temporary.replace(path)
