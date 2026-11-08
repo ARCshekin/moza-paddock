@@ -115,7 +115,7 @@ func run() throws {
             snapshot.clutch = UInt32((clutchValue * 65535).rounded())
         }
         snapshot.keyboardActions = controls.actions(pressed: pressed)
-        for button in input.buttons() where (1...34).contains(button) {
+        for button in input.buttons() where (1...40).contains(button) {
             snapshot.buttons |= 1 << UInt64(button - 1)
         }
         if let hat = axes.first(where: { $0.usage == 0x39 }) {

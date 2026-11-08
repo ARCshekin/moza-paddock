@@ -125,10 +125,15 @@ int main(void) {
     put64(SHM_IN + 56, nowMs);
     assert(CALL(device, 9, HR (*)(Device *, U32, PTR), 272, st) == OK);
     assert(st[73] == 128 && st[81] == 128 && st[82] == 0);
+    put32(SHM_IN + 40, 0x4701); /* buttons 26, 34, 35, 36 and 40 */
+    put32(SHM_IN + 52, 0x3034424d); /* MB40 */
+    assert(CALL(device, 9, HR (*)(Device *, U32, PTR), 272, st) == OK);
+    assert(st[73] == 128 && st[81] == 128 && st[82] == 128 && st[83] == 128 && st[87] == 128);
+    assert(st[84] == 0 && st[88] == 0); /* unpressed 37, absent 41 */
     /* Legacy publisher changes its sequence but cannot refresh the extension. */
     input(1, 32768, 65535, 65535, 0, 0, 8);
     assert(CALL(device, 9, HR (*)(Device *, U32, PTR), 272, st) == OK);
-    assert(st[73] == 0 && st[81] == 0);
+    assert(st[73] == 0 && st[81] == 0 && st[82] == 0 && st[83] == 0 && st[87] == 0);
 
     keyboard_actions(1); assert(lastKey == 0x1b && keyCount == 1);
     keyboard_actions(1); assert(keyCount == 1);
