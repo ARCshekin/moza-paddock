@@ -13,10 +13,3 @@ IsIconic
 ShowWindow
 SetForegroundWindow
 SetProcessDPIAware
-SetWinEventHook
-UnhookWinEvent
-PeekMessageW
-TranslateMessage
-DispatchMessageW
-GetWindow
-GetClassNameW

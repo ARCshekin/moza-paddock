@@ -14,21 +14,10 @@ typedef struct {
     U16 show, reservedBytes; PTR reservedData, input, output, error;
 } Startup;
 typedef struct { PTR process, thread; U32 pid, tid; } Process;
-typedef struct { PTR window; U32 message, padding; U64 wparam; I64 lparam; U32 time; int x, y; U32 private; } Message;
-_Static_assert(sizeof(Message) == 48, "Win64 MSG ABI");
 _Static_assert(sizeof(Startup) == 104 && sizeof(MonitorInfo) == 104, "Win64 ABI");
 #define API __declspec(dllimport)
 API int EnumDisplayMonitors(PTR, const Rect *, int (*)(PTR, PTR, Rect *, I64), I64);
 API int GetMonitorInfoW(PTR, MonitorInfo *);
-API PTR SetWinEventHook(U32, U32, PTR, void (*)(PTR, U32, PTR, int, int, U32, U32), U32, U32, U32);
-API int UnhookWinEvent(PTR);
-API int PeekMessageW(Message *, PTR, U32, U32, U32);
-API int TranslateMessage(const Message *);
-API I64 DispatchMessageW(const Message *);
-API PTR GetWindow(PTR, U32);
-API int GetClassNameW(PTR, U16 *, int);
-API U32 ResumeThread(PTR);
-API int TerminateProcess(PTR, U32);
 API int EnumWindows(int (*)(PTR, I64), I64);
 API U32 GetWindowThreadProcessId(PTR, U32 *);
 API int GetWindowRect(PTR, Rect *);
@@ -81,35 +70,11 @@ static int monitorCallback(PTR monitor, PTR dc, Rect *rect, I64 context) {
     }
     return 1;
 }
-static int isGameWindow(PTR window) {
-    U32 pid = 0;
-    GetWindowThreadProcessId(window, &pid);
-    return pid == gamePID && !(GetWindowLongPtrW(window, -16) & 0x40000000);
-}
-static int isDialog(PTR window) {
-    U16 name[16] = {0};
-    GetClassNameW(window, name, 16);
-    return GetWindow(window, 4) || (GetWindowLongPtrW(window, -20) & 1) ||
-        (name[0]=='#' && name[1]=='3' && name[2]=='2' && name[3]=='7' && name[4]=='7' && name[5]=='0' && !name[6]);
-}
-/* Subscribe before the suspended child can create a window. Wine applications
- * can ignore STARTUPINFO coordinates, including CSP's early loading window. */
-static void windowEvent(PTR hook, U32 event, PTR window, int object, int child, U32 thread, U32 time) {
-    (void)hook; (void)event; (void)thread; (void)time;
-    if (!window || object || child || !isGameWindow(window)) return;
-    Rect r;
-    if (!GetWindowRect(window, &r)) return;
-    int x = target.left, y = target.top;
-    if (isDialog(window)) {
-        x += ((target.right-target.left) - (r.right-r.left))/2;
-        y += ((target.bottom-target.top) - (r.bottom-r.top))/2;
-    }
-    SetWindowPos(window, 0, x, y, 0, 0, 1 | 4 | 0x10); /* NOSIZE, NOZORDER, NOACTIVATE */
-    if (GetWindowRect(window, &r)) logRect("Early game window: ", r);
-}
 static int windowCallback(PTR window, I64 context) {
     (void)context;
-    if (!isGameWindow(window) || isDialog(window)) return 1;
+    U32 pid = 0;
+    GetWindowThreadProcessId(window, &pid);
+    if (pid != gamePID || (GetWindowLongPtrW(window, -16) & 0x40000000)) return 1;
     Rect r;
     if (GetClientRect(window, &r) && r.right >= 300 && r.bottom >= 200) {
         gameWindow = window; return 0;
@@ -138,24 +103,13 @@ void main(void) {
     startup.x = (U32)target.left; startup.y = (U32)target.top;
     startup.width = (U32)(target.right - target.left); startup.height = (U32)(target.bottom - target.top);
     U16 command[] = {'a','c','s','.','e','x','e',0};
-    if (!CreateProcessW(0, command, 0, 0, 0, 4, 0, 0, &startup, &process)) {
+    if (!CreateProcessW(0, command, 0, 0, 0, 0, 0, 0, &startup, &process)) {
         logRect("CreateProcess failed: ", (Rect){(int)GetLastError(), 0, 0, 0});
         ExitProcess(3);
     }
-    gamePID = process.pid;
-    PTR hook = SetWinEventHook(0x8000, 0x8002, 0, windowEvent, gamePID, 0, 0);
-    if (!hook || ResumeThread(process.thread) == 0xffffffffu) {
-        TerminateProcess(process.process, 5);
-        CloseHandle(process.thread); CloseHandle(process.process);
-        CloseHandle(logFile); ExitProcess(5);
-    }
-    CloseHandle(process.thread);
+    CloseHandle(process.thread); gamePID = process.pid;
     int placed = 0;
     while (WaitForSingleObject(process.process, 25) == 258) {
-        Message message;
-        while (PeekMessageW(&message, 0, 0, 0, 1)) {
-            TranslateMessage(&message); DispatchMessageW(&message);
-        }
         if (!gameWindow) EnumWindows(windowCallback, 0);
         if (!gameWindow || IsIconic(gameWindow)) continue;
         Rect current;
@@ -171,7 +125,6 @@ void main(void) {
             placed = 1;
         }
     }
-    UnhookWinEvent(hook);
     U32 code = 0;
     GetExitCodeProcess(process.process, &code);
     CloseHandle(process.process); CloseHandle(logFile); ExitProcess(code);
