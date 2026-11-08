@@ -35,6 +35,8 @@ print('PASS: x64 PE dinput8.dll, scoped KERNEL32/USER32 imports')
 PY
 print "Built Bridge/build/dinput8.dll"
 "$llvm_bin/clang" --target=x86_64-pc-windows-msvc -std=c11 -O2 -ffreestanding -fno-builtin -fno-stack-protector -Wall -Wextra -Werror -c Bridge/display-launcher.c -o Bridge/build/display-launcher.obj
+"$llvm_bin/clang" -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined Bridge/tests/test_steam_ready.c -o Bridge/build/test-steam-ready
+Bridge/build/test-steam-ready
 "$llvm_bin/llvm-dlltool" -m i386:x86-64 -d Bridge/display-kernel32.def -l Bridge/build/display-kernel32.lib
 "$llvm_bin/llvm-dlltool" -m i386:x86-64 -d Bridge/display-user32.def -l Bridge/build/display-user32.lib
 "${link[@]}" /Brepro /nodefaultlib /machine:x64 /entry:main /subsystem:windows /dynamicbase /nxcompat /out:Bridge/build/moza-display-launcher.exe Bridge/build/display-launcher.obj Bridge/build/display-kernel32.lib Bridge/build/display-user32.lib
