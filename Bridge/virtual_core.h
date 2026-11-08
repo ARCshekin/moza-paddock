@@ -124,7 +124,7 @@ typedef struct {
 typedef struct {
     U32 offset, source, width;
 } Mapping;
-#define BUTTON_COUNT 34u
+#define BUTTON_COUNT 40u
 #define SOURCE_COUNT (5u + BUTTON_COUNT)
 #define SRC_ZERO SOURCE_COUNT
 #define SRC_NOPOV (SOURCE_COUNT + 1u)

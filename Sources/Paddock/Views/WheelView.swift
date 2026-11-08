@@ -15,7 +15,7 @@ struct WheelView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 5) {
                         SectionLabel(text: "Назначения кнопок")
-                        Text("Нажмите «Назначить», затем кнопку 1–34 на руле.").font(.caption).foregroundStyle(.secondary)
+                        Text("Нажмите «Назначить», затем кнопку 1–40 на руле.").font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
                     if model.pendingBinding != nil { Button("Отмена") { model.pendingBinding = nil } }

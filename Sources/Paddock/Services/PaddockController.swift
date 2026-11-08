@@ -108,7 +108,7 @@ final class PaddockController: ObservableObject {
         if presets.isEmpty {
             let controls = INI(url: paths.documents.appendingPathComponent("cfg/controls.ini"))
             for action in ButtonAction.all {
-                if controls[action.id, "JOY"] == "0", let button = Int(controls[action.id, "BUTTON"]), button >= 0, button < 34 {
+                if controls[action.id, "JOY"] == "0", let button = Int(controls[action.id, "BUTTON"]), button >= 0, button < 40 {
                     configuration.bindings[action.id] = button + 1
                 }
             }
@@ -205,7 +205,7 @@ final class PaddockController: ObservableObject {
         if let action = pendingBinding {
             if Date() > bindingDeadline { pendingBinding = nil; message = "Назначение отменено: кнопка не нажата." }
             else if let button = pressed.subtracting(previousButtons).sorted().first {
-                if button > 34 { error = "Мост поддерживает кнопки 1–34; выберите другую кнопку." }
+                if button > 40 { error = "Мост поддерживает кнопки 1–40; выберите другую кнопку." }
                 else {
                     for (other, assigned) in configuration.bindings where assigned == button && other != action {
                         configuration.bindings.removeValue(forKey: other)
