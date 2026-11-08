@@ -176,5 +176,5 @@ launch_child:
         Sleep(2000);
         goto launch_child;
     }
-    shutdown(); CloseHandle(sessionMutex); CloseHandle(logFile); ExitProcess(code);
+    shutdown(); CloseHandle(sessionMutex); CloseHandle(logFile); ExitProcess(launcher_exit_code(code));
 }
