@@ -40,7 +40,10 @@ API int WriteFile(PTR, const void *, U32, U32 *, PTR);
 API PTR LoadLibraryW(const U16 *);
 API PTR GetProcAddress(PTR, const char *);
 API void Sleep(U32);
+API U64 GetTickCount64(void);
+API PTR CreateMutexW(PTR, int, const U16 *);
 #include "steam-ready.h"
+#include "startup-retry.h"
 static unsigned char (*steamInitialize)(void);
 static int initializeSteam(void) { return steamInitialize && steamInitialize() != 0; }
 static PTR logFile;
@@ -64,6 +67,13 @@ static void logRect(const char *label, Rect r) {
     n = string(b, n, "x"); n = number(b, n, r.bottom - r.top);
     b[n++] = '\r'; b[n++] = '\n';
     WriteFile(logFile, b, n, &written, 0);
+}
+static void logExit(U32 code, U32 attempt, U64 elapsed) {
+    char b[256]; U32 n = string(b, 0, "Simulator exit code="), written;
+    n = number(b, n, (int)code); n = string(b, n, " attempt=");
+    n = number(b, n, (int)attempt); n = string(b, n, " elapsed_ms=");
+    n = number(b, n, elapsed > 2147483647 ? 2147483647 : (int)elapsed);
+    b[n++] = '\r'; b[n++] = '\n'; WriteFile(logFile, b, n, &written, 0);
 }
 static int monitorCallback(PTR monitor, PTR dc, Rect *rect, I64 context) {
     (void)dc; (void)rect; (void)context;
@@ -92,6 +102,12 @@ static int same(Rect a, Rect b) {
 }
 void main(void) {
     static const U16 logName[] = {'m','o','z','a','-','d','i','s','p','l','a','y','.','l','o','g',0};
+    static const U16 mutexName[] = {'L','o','c','a','l','\\','M','o','z','a','P','a','d','d','o','c','k','.','A','s','s','e','t','t','o','S','e','s','s','i','o','n',0};
+    PTR sessionMutex = CreateMutexW(0, 0, mutexName);
+    if (!sessionMutex || GetLastError() == 183) {
+        ExitProcess(6);
+
+    }
     logFile = CreateFileW(logName, 0x40000000, 3, 0, 2, 0x80, 0);
     SetProcessDPIAware();
     EnumDisplayMonitors(0, 0, monitorCallback, 0);
@@ -110,8 +126,14 @@ void main(void) {
         logRect("Steam API unavailable; sign in and retry: ", (Rect){0});
         CloseHandle(logFile); ExitProcess(5);
     }
-    shutdown();
+    /* Keep this API connection alive until the child exits. Releasing it
+     * before CreateProcess can race Steam's game-process handoff. */
+    void (*callbacks)(void) = (void (*)(void))GetProcAddress(steam, "SteamAPI_RunCallbacks");
     logRect("Steam API ready: ", (Rect){0});
+    U32 attempt = 0;
+launch_child:
+    gameWindow = 0;
+    U64 started = GetTickCount64();
     Startup startup = {0}; Process process = {0};
     startup.size = sizeof(startup);
     startup.flags = 1 | 2 | 4; /* USESHOWWINDOW, USESIZE, USEPOSITION */
@@ -124,9 +146,11 @@ void main(void) {
         ExitProcess(3);
     }
     CloseHandle(process.thread); gamePID = process.pid;
-    int placed = 0;
+    int placed = 0, sawWindow = 0;
     while (WaitForSingleObject(process.process, 25) == 258) {
+        if (callbacks) callbacks();
         if (!gameWindow) EnumWindows(windowCallback, 0);
+        if (gameWindow) sawWindow = 1;
         if (!gameWindow || IsIconic(gameWindow)) continue;
         Rect current;
         if (!GetWindowRect(gameWindow, &current)) { gameWindow = 0; continue; }
@@ -143,5 +167,14 @@ void main(void) {
     }
     U32 code = 0;
     GetExitCodeProcess(process.process, &code);
-    CloseHandle(process.process); CloseHandle(logFile); ExitProcess(code);
+    U64 elapsed = GetTickCount64() - started;
+    logExit(code, attempt, elapsed);
+    CloseHandle(process.process);
+    if (retry_startup(code, sawWindow, elapsed, attempt)) {
+        attempt++;
+        logRect("Retrying early Steam bootstrap exit: ", (Rect){(int)code, (int)attempt, (int)code, (int)attempt});
+        Sleep(2000);
+        goto launch_child;
+    }
+    shutdown(); CloseHandle(sessionMutex); CloseHandle(logFile); ExitProcess(launcher_exit_code(code));
 }

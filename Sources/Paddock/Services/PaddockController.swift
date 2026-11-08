@@ -350,7 +350,9 @@ final class PaddockController: ObservableObject {
                             DispatchQueue.main.async {
                                 guard let self else { return }
                                 if process.terminationStatus != 0 {
-                                    if process.terminationStatus == 5 {
+                                    if process.terminationStatus == 6 {
+                                        self.error = "Другой запуск уже готовит заезд. Дождитесь его завершения."
+                                    } else if process.terminationStatus == 5 {
                                         self.error = "Steam ещё не готов к запуску игры. Проверьте вход в аккаунт и повторите запуск."
                                     } else {
                                     self.error = "Игра завершилась с кодом \(process.terminationStatus). Проверьте Steam и подключение внешнего экрана. Журнал: \(log.path)"

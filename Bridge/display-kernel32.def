@@ -11,3 +11,5 @@ WriteFile
 LoadLibraryW
 GetProcAddress
 Sleep
+GetTickCount64
+CreateMutexW
