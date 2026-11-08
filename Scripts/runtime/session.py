@@ -36,7 +36,7 @@ def shutdown(runtime):
             return False
     # Do not start a new Steam instance merely to ask it to exit.
     if steam_running(prefix):
-        run([str(wine), str(runtime.steam / 'steam.exe'), '-shutdown'], 8)
+        run([str(wine)] + getattr(runtime, 'steam_shutdown_arguments', [str(runtime.steam / 'steam.exe'), '-shutdown']), 8)
         run([str(server), '-w'], 4)  # Give Steam time to flush its state.
     # Prefix-scoped wineserver shutdown also removes CEF, explorer and services.
     stopped = run([str(server), '-k'], 4)

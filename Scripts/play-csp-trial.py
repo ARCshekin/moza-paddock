@@ -6,6 +6,7 @@ import subprocess
 import time
 from runtime.steam_cef import install as install_steam_cef
 from runtime.csp_trial import TrialRuntime
+from runtime.session import shutdown
 from runtime.managed import ManagedRuntime, DEFAULT_ROOT
 from runtime.csp_performance import apply, read_ini, write_ini, video_profile
 
@@ -94,8 +95,11 @@ def main():
                 bridge.kill(); bridge.wait()
         if bridge_log is not None:
             bridge_log.close()
-        for path, data in originals.items():
-            path.write_bytes(data)
+        try:
+            shutdown(runtime)
+        finally:
+            for path, data in originals.items():
+                path.write_bytes(data)
 
 
 if __name__ == '__main__':

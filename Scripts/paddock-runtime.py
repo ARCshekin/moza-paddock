@@ -37,6 +37,7 @@ def main():
         if args.provider == 'crossover':
             runtime.prefix = Path.home() / 'Library/Application Support/CrossOver/Bottles' / args.bottle
             runtime.wine = Path.home() / 'Applications/CrossOver.app/Contents/SharedSupport/CrossOver/bin/wine'
+            runtime.steam_shutdown_arguments = ['--bottle', args.bottle, '--cx-app', 'C:/Program Files (x86)/Steam/steam.exe', '-shutdown']
         if not shutdown(runtime):
             raise RuntimeError('Wine session did not finish shutting down')
         print('Session Steam and Wine processes closed.')
