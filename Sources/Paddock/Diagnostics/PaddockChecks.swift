@@ -11,6 +11,15 @@ enum PaddockChecks {
             guard condition() else { throw PaddockError(label) }
             print("PASS \(label)")
         }
+        var shaped = WheelInputSettings()
+        try check(abs(shaped.steering(0.5) - 0.5) < 0.00001, "default steering remains linear")
+        shaped.steeringGamma = 2; shaped.steeringDeadzone = 0.1
+        try check(shaped.steering(0.05) == 0 && shaped.steering(1) == 1 && shaped.steering(-1) == -1, "steering curve respects deadzone, saturation and symmetry")
+        let original = DriveConfiguration()
+        let encoded = try JSONEncoder().encode(original)
+        try check(!String(decoding: encoded, as: UTF8.self).contains("\"wheel\""), "legacy configurations retain record fingerprints when wheel settings are default")
+        let old = try JSONDecoder().decode(DriveConfiguration.self, from: encoded)
+        try check(old.wheel == nil, "old presets load with default wheel settings")
         let input = INI("[STEER]\r\nJOY=0 ; wheel\r\nLOCK=900\n[OTHER]\nKEEP=hello=world\n")
         try check(input["STEER", "JOY"] == "0" && INI(input.text)["OTHER", "KEEP"] == "hello=world", "INI round trip and inline comments")
         try check(PaddockController.gamePIDs(in: " 123 acs.exe \n124 C:/Program Files/assettocorsa/acs.exe \n125 /winewrapper.exe --run C:/acs.exe \n126 /bin/zsh -c ps\n") == [123, 124], "game process detection accepts relative and absolute launch commands")
@@ -21,12 +30,18 @@ enum PaddockChecks {
         configuration.mode = .race; configuration.opponents = 3
         configuration.setup = "magione/test.ini"
         configuration.bindings = ["GEARUP": 14, "GEARDN": 13, "DRS": 2]
+        configuration.wheelSettings = shaped
+        configuration.bindings["BRIDGE_CLUTCH"] = 34
+        configuration.bindings["BRIDGE_ESCAPE"] = 33
+        configuration.bindings["__EXT_PIT_LIMITER"] = 32
         let paths = PaddockPaths(project: PaddockPaths.current.project, bottle: "Steam-3", documentsOverride: temp.appendingPathComponent("Documents"), storeOverride: temp.appendingPathComponent("Store"))
         var independent = paths; independent.runtime = .standalone
         try check(independent.bottleURL == paths.store.appendingPathComponent("Prefixes/assetto") && independent.game != paths.game && independent.documents == paths.documents, "runtime switch isolates prefix while preserving Documents")
         let invocation = WineProcess.arguments(paths: independent, arguments: ["reg", "query", "HKCU\\Software\\Valve\\Steam"])
         try check(invocation.contains("standalone") && invocation.suffix(3) == ["reg", "query", "HKCU\\Software\\Valve\\Steam"], "Wine arguments retain Windows registry paths without shell interpolation")
         try ConfigurationWriter.write(configuration, paths: paths)
+        let bridgeControls = try JSONDecoder().decode(BridgeControlConfiguration.self, from: Data(contentsOf: paths.store.appendingPathComponent(WheelInputSettings.fileName)))
+        try check(bridgeControls.bindings["BRIDGE_CLUTCH"] == 34 && bridgeControls.actions(pressed: [33]) == 1, "button clutch and Escape reach native bridge configuration")
         let cfg = paths.documents.appendingPathComponent("cfg")
         let controls = INI(url: cfg.appendingPathComponent("controls.ini"))
         let race = INI(url: cfg.appendingPathComponent("race.ini"))

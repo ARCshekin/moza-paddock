@@ -21,16 +21,17 @@ mkdir -p Bridge/build
 Bridge/build/test-bridge
 "$llvm_bin/clang" --target=x86_64-pc-windows-msvc -std=c11 -O2 -ffreestanding -fno-builtin -fno-stack-protector -Wall -Wextra -Werror -DCFB_USER_ID=$(id -u) -c Bridge/observe.c -o Bridge/build/observe.obj
 "$llvm_bin/llvm-dlltool" -m i386:x86-64 -d Bridge/kernel32.def -l Bridge/build/kernel32.lib
-"${link[@]}" /Brepro /dll /nodefaultlib /machine:x64 /entry:DllMain /dynamicbase /nxcompat /out:Bridge/build/dinput8.dll /def:Bridge/exports.def Bridge/build/observe.obj Bridge/build/kernel32.lib
+"$llvm_bin/llvm-dlltool" -m i386:x86-64 -d Bridge/input-user32.def -l Bridge/build/input-user32.lib
+"${link[@]}" /Brepro /dll /nodefaultlib /machine:x64 /entry:DllMain /dynamicbase /nxcompat /out:Bridge/build/dinput8.dll /def:Bridge/exports.def Bridge/build/observe.obj Bridge/build/kernel32.lib Bridge/build/input-user32.lib
 "$llvm_bin/llvm-readobj" --file-headers --coff-imports --coff-exports Bridge/build/dinput8.dll > Bridge/build/pe-inspection.txt
 python3 - <<'PY'
 from pathlib import Path
 s=Path('Bridge/build/pe-inspection.txt').read_text()
 assert 'IMAGE_FILE_MACHINE_AMD64' in s
-assert s.count('Import {')==1 and 'Name: KERNEL32.dll' in s
+assert s.count('Import {')==2 and 'Name: KERNEL32.dll' in s and 'Name: USER32.dll' in s
 for export in ['DirectInput8Create','DllCanUnloadNow','DllGetClassObject','DllRegisterServer','DllUnregisterServer']:
     assert export in s
-print('PASS: x64 PE dinput8.dll, KERNEL32-only imports')
+print('PASS: x64 PE dinput8.dll, scoped KERNEL32/USER32 imports')
 PY
 print "Built Bridge/build/dinput8.dll"
 "$llvm_bin/clang" --target=x86_64-pc-windows-msvc -std=c11 -O2 -ffreestanding -fno-builtin -fno-stack-protector -Wall -Wextra -Werror -c Bridge/display-launcher.c -o Bridge/build/display-launcher.obj

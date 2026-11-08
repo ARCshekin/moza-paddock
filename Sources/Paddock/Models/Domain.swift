@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import MozaKit
 
 struct PaddockError: LocalizedError {
     let text: String
@@ -29,7 +30,31 @@ struct ButtonAction: Identifiable {
     let id: String
     let name: String
     let symbol: String
+    var bridgeOnly: Bool { id.hasPrefix("BRIDGE_") }
+    var cspOnly: Bool { id.hasPrefix("__EXT_") }
+    var group: String { bridgeOnly ? "Сцепление и меню" : cspOnly ? "CSP и моды" : "Управление автомобилем" }
     static let all: [ButtonAction] = [
+        .init(id: "BRIDGE_CLUTCH", name: "Сцепление кнопкой (удерживать)", symbol: "pedal.clutch"),
+        .init(id: "BRIDGE_ESCAPE", name: "Escape / меню паузы", symbol: "escape"),
+        .init(id: "BRIDGE_ENTER", name: "Enter / подтвердить", symbol: "return"),
+        .init(id: "BRIDGE_UP", name: "Меню: вверх", symbol: "arrow.up"),
+        .init(id: "BRIDGE_DOWN", name: "Меню: вниз", symbol: "arrow.down"),
+        .init(id: "BRIDGE_LEFT", name: "Меню: влево", symbol: "arrow.left"),
+        .init(id: "BRIDGE_RIGHT", name: "Меню: вправо", symbol: "arrow.right"),
+        .init(id: "__EXT_PIT_LIMITER", name: "Пит-лимитер", symbol: "speedometer"),
+        .init(id: "__EXT_SPEED_LIMITER", name: "Лимитер автомобиля (если предусмотрен)", symbol: "gauge.medium"),
+        .init(id: "__EXT_STARTER", name: "Стартер CSP", symbol: "power"),
+        .init(id: "__EXT_CAR_IGNITION", name: "Зажигание RSS", symbol: "key"),
+        .init(id: "__EXT_CAR_STARTER", name: "Стартер RSS", symbol: "power.circle"),
+        .init(id: "__EXT_WIPERS_MORE", name: "Дворники: быстрее", symbol: "wiper.windshield"),
+        .init(id: "__EXT_WIPERS_LESS", name: "Дворники: медленнее", symbol: "wiper.windshield"),
+        .init(id: "__EXT_HAZARDS", name: "Аварийные огни", symbol: "exclamationmark.triangle"),
+        .init(id: "TURBOUP", name: "Турбо +", symbol: "plus.circle"),
+        .init(id: "TURBODN", name: "Турбо −", symbol: "minus.circle"),
+        .init(id: "ENGINE_BRAKE_UP", name: "Торможение двигателем +", symbol: "plus.circle"),
+        .init(id: "ENGINE_BRAKE_DN", name: "Торможение двигателем −", symbol: "minus.circle"),
+        .init(id: "MGUK_DELIVERY_UP", name: "MGU-K: мощность +", symbol: "bolt"),
+        .init(id: "MGUK_DELIVERY_DN", name: "MGU-K: мощность −", symbol: "bolt"),
         .init(id: "GEARUP", name: "Передача вверх", symbol: "plus"),
         .init(id: "GEARDN", name: "Передача вниз", symbol: "minus"),
         .init(id: "HANDBRAKE", name: "Ручной тормоз", symbol: "parkingsign.brakesignal"),
@@ -75,6 +100,11 @@ struct DriveConfiguration: Codable, Equatable {
     var width = 1920
     var height = 1080
     var bindings: [String: Int] = ["GEARUP": 14, "GEARDN": 13] // one-based HID numbers
+    var wheel: WheelInputSettings? = nil
+    var wheelSettings: WheelInputSettings {
+        get { wheel ?? WheelInputSettings() }
+        set { wheel = newValue == WheelInputSettings() ? nil : newValue }
+    }
     var fingerprint: String {
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
         let data = (try? encoder.encode(self)) ?? Data()

@@ -1,4 +1,5 @@
 import Foundation
+import MozaKit
 
 struct INI {
     var sections: [String: [String: String]] = [:]
@@ -44,19 +45,31 @@ enum ConfigurationWriter {
         controls["HEADER", "INPUT_METHOD"] = "WHEEL"
         controls["CONTROLLERS", "CON0"] = "MOZA R5 Bridge"
         controls["CONTROLLERS", "PGUID0"] = "0004346E-0000-0000-0000-504944564944"
-        for (key, value) in ["JOY": "0", "AXLE": "0", "LOCK": "\(c.angle)", "FF_GAIN": "1", "STEER_GAMMA": "1", "SCALE": "1", "STEER_FILTER": "0", "SPEED_SENSITIVITY": "0"] { controls["STEER", key] = value }
+        for (key, value) in ["JOY": "0", "AXLE": "0", "LOCK": "\(c.angle)", "FF_GAIN": "1", "STEER_GAMMA": "1", "SCALE": "\(c.wheelSettings.steeringScale)", "STEER_FILTER": "0", "SPEED_SENSITIVITY": "\(c.wheelSettings.speedSensitivity)"] { controls["STEER", key] = value }
         for (section, axle) in [("THROTTLE", 1), ("BRAKES", 5)] {
             controls[section, "JOY"] = "0"; controls[section, "AXLE"] = "\(axle)"
             controls[section, "MIN"] = "-1"; controls[section, "MAX"] = "1"
         }
         controls["BRAKES", "GAMMA"] = "1"
         controls["FF_TWEAKS", "MIN_FF"] = "0"
-        for action in ButtonAction.all {
+        controls["CLUTCH", "JOY"] = "0"; controls["CLUTCH", "AXLE"] = "6"
+        controls["CLUTCH", "MIN"] = "-1"; controls["CLUTCH", "MAX"] = "1"
+        controls["CLUTCH", "GAMMA"] = "1"
+        for action in ButtonAction.all where !action.bridgeOnly {
             let button = c.bindings[action.id]
             controls[action.id, "JOY"] = button == nil ? "-1" : "0"
             controls[action.id, "BUTTON"] = button.map { "\($0 - 1)" } ?? "-1"
         }
         try controls.save(cfg.appendingPathComponent("controls.ini"))
+        let bridgeConfiguration = BridgeControlConfiguration(tuning: c.wheelSettings, bindings: c.bindings)
+        try JSONEncoder().encode(bridgeConfiguration).write(to: paths.store.appendingPathComponent(WheelInputSettings.fileName), options: .atomic)
+        // The validated Metal launcher has separate Documents; share controls only.
+        let trialCFG = paths.store.appendingPathComponent("Trials/Documents/Assetto Corsa/cfg")
+        if fm.fileExists(atPath: trialCFG.path) {
+            let target = trialCFG.appendingPathComponent("controls.ini")
+            if fm.fileExists(atPath: target.path) { try fm.copyItem(at: target, to: backup.appendingPathComponent("metal-controls.ini")) }
+            try controls.save(target)
+        }
         var race = INI(url: cfg.appendingPathComponent("race.ini"))
         for key in Array(race.sections.keys) where key.hasPrefix("SESSION_") || key.hasPrefix("CAR_") { race.sections.removeValue(forKey: key) }
         let count = c.mode == .race ? c.opponents + 1 : 1
@@ -78,11 +91,12 @@ enum ConfigurationWriter {
         race["GHOST_CAR", "RECORDING"] = "1"; race["GHOST_CAR", "PLAYING"] = c.mode == .hotlap ? "1" : "0"
         race["LAP_INVALIDATOR", "ALLOWED_TYRES_OUT"] = "2"
         var assists = INI(url: cfg.appendingPathComponent("assists.ini"))
-        for (key, value) in ["AUTO_CLUTCH": c.autoClutch ? "1" : "0", "AUTO_SHIFTER": c.autoShift ? "1" : "0", "AUTO_BLIP": "1", "ABS": "\(c.abs)", "TRACTION_CONTROL": "\(c.traction)", "STABILITY_CONTROL": "0", "DAMAGE": "0", "IDEAL_LINE": "0"] {
+        for (key, value) in ["AUTO_CLUTCH": c.autoClutch && c.bindings["BRIDGE_CLUTCH"] == nil ? "1" : "0", "AUTO_SHIFTER": c.autoShift ? "1" : "0", "AUTO_BLIP": "1", "ABS": "\(c.abs)", "TRACTION_CONTROL": "\(c.traction)", "STABILITY_CONTROL": "0", "DAMAGE": "0", "IDEAL_LINE": "0"] {
             race["ASSISTS", key] = value; assists["ASSISTS", key] = value
         }
         try race.save(cfg.appendingPathComponent("race.ini"))
         try assists.save(cfg.appendingPathComponent("assists.ini"))
+        if fm.fileExists(atPath: trialCFG.path) { try assists.save(trialCFG.appendingPathComponent("assists.ini")) }
         var video = INI(url: cfg.appendingPathComponent("video.ini"))
         video["VIDEO", "FULLSCREEN"] = "0"; video["VIDEO", "WIDTH"] = "\(c.width)"; video["VIDEO", "HEIGHT"] = "\(c.height)"
         try video.save(cfg.appendingPathComponent("video.ini"))

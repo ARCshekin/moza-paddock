@@ -18,7 +18,9 @@
 _Static_assert(SHM_FX + SHM_FX_SIZE * SHM_FX_COUNT <= SHM_SIZE, "shm layout");
 
 typedef struct {
-    U32 axis[4], buttons, hat;
+    U32 axis[4];
+    U64 buttons;
+    U32 hat, actions;
     U64 sequence;
 } Snapshot;
 static U32 le32(const unsigned char *p) {
@@ -111,7 +113,7 @@ static int read_snapshot_status(Snapshot *out, U32 *reason) {
     *reason = 2;
     if (ld32(p) != SHM_MAGIC || ld32(p + 4) != SHM_VERSION)
         return 0;
-    unsigned char b[48];
+    unsigned char b[64];
     U32 s1 = 1, s2 = 0;
     for (int tries = 0; tries < 64; tries++) {
         s1 = ld32(p + SHM_IN);
@@ -143,11 +145,19 @@ static int read_snapshot_status(Snapshot *out, U32 *reason) {
     for (int i = 0; i < 4; i++)
         s.axis[i] = le32(b + 16 + 4 * i);
     s.buttons = le32(b + 32);
+    if (s.buttons & ~0x1ffffffull) { *reason = 7; return 0; }
+    s.actions = 0;
+    if (le32(b + 52) == 0x3433424du && le32(b + 48) == s1 && le64(b + 56) == stamp) {
+        U32 extra = le32(b + 40), actions = le32(b + 44);
+        if ((extra & ~0x1ffu) || (actions & ~0x3fu)) { *reason = 7; return 0; }
+        s.buttons |= (U64)extra << 25;
+        s.actions = actions;
+    }
     s.hat = le32(b + 36);
     s.sequence = s1;
     *reason = 7;
     if (s.axis[0] > 65535 || s.axis[1] > 65535 || s.axis[2] > 65535 || s.axis[3] > 65535 ||
-        (s.buttons & ~0x1ffffffu) || s.hat > 8)
+        (s.buttons & ~0x3ffffffffull) || s.hat > 8)
         return 0;
     *reason = 0;
     *out = s;
