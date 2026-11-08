@@ -126,6 +126,7 @@ struct SessionContext: Codable, Identifiable {
     var configuration: DriveConfiguration
     var carName: String
     var trackName: String
+    var onlineServer: String? = nil
     var started = Date()
     var finished: Date?
     var bestMilliseconds: Int?

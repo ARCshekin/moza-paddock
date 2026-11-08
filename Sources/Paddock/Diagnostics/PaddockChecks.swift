@@ -53,6 +53,17 @@ enum PaddockChecks {
         try ConfigurationWriter.write(configuration, paths: paths)
         let hotlap = INI(url: cfg.appendingPathComponent("race.ini"))
         try check(hotlap["RACE", "CARS"] == "1" && hotlap.sections["CAR_3"] == nil && hotlap["SESSION_0", "SPAWN_SET"] == "HOTLAP_START", "mode switch clears previous grid")
+        let server = OnlineServerDetails(host: "127.0.0.1", httpPort: 8081, racePort: 9600, name: "Test server", track: "magione", cars: [configuration.car], free: [configuration.car: 1], clients: 0, capacity: 1, password: true, pickup: true, csp: false, latency: 1)
+        let connection = OnlineConnection(server: server, car: configuration.car, player: "Test Driver", password: "test-secret")
+        try connection.write(paths: paths, guid: "76561198000000000")
+        let remote = INI(url: cfg.appendingPathComponent("race.ini"))
+        try check(remote["REMOTE", "SERVER_PORT"] == "9600" && remote["REMOTE", "SERVER_HTTP_PORT"] == "8081" && remote["CAR_0", "DRIVER_NAME"] == "Test Driver", "online uses TCP race port separately from HTTP discovery port")
+        var rejected = false
+        do { try OnlineConnection(server: server, car: configuration.car, player: "bad\n[REMOTE]", password: "").validate() } catch { rejected = true }
+        try check(rejected, "online rejects INI injection in transient player credentials")
+        OnlineConnection.clearCredentials(paths: paths)
+        let cleared = INI(url: cfg.appendingPathComponent("race.ini"))
+        try check(cleared["REMOTE", "PASSWORD"].isEmpty && cleared["REMOTE", "GUID"].isEmpty && cleared["REMOTE", "ACTIVE"] == "0" && cleared["RACE", "TRACK"] == configuration.track, "online cleanup removes secrets and preserves race configuration")
         let storage = PaddockStorage(directory: paths.store)
         let preset = DrivePreset(name: "Test", configuration: configuration)
         try storage.save(.init(presets: [preset], sessions: [], selectedPreset: preset.id, draft: configuration))

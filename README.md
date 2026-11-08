@@ -61,3 +61,7 @@ python3 Scripts/check-runtime.py
 Пресеты и история: `~/Library/Application Support/MozaPaddock/paddock.json`. Игровые настройки: `~/Documents/Assetto Corsa`. Резервные копии модов — `ModBackups` в папке данных приложения. Эти файлы и Steam-учётные данные не публикуются.
 
 MIT для кода проекта; сторонние компоненты имеют собственные лицензии. См. [LICENSE](LICENSE), [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES.md) и лицензию моста в `Bridge`.
+
+### Серверы
+
+Вкладка «Онлайн»: публичный каталог, поиск и страницы, просмотр свободных машин, прямой адрес/ссылка Content Manager и подключение к обычным pickup-серверам через текущую среду Wine. CSP-серверы и бронирование пока не поддерживаются. [Подробнее](docs/online.md).
