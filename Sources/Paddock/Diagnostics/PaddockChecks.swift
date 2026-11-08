@@ -34,10 +34,12 @@ enum PaddockChecks {
         try check(controls["STEER", "LOCK"] == "540" && controls["ACTION_HORN", "JOY"] == "-1", "wheel angle and unassigned actions")
         try check(race["RACE", "CARS"] == "4" && race["CAR_3", "MODEL"] == configuration.car && race["SESSION_0", "TYPE"] == "3", "race mode creates AI grid")
         try check(race["CAR_0", "SETUP"] == "magione\\test.ini", "car setup ID preserves track directory in Windows form")
+        try check(race.sections["RACE"]?["MODEL_CONFIG"] == "" && (0..<4).allSatisfy { race.sections["CAR_\($0)"]?["MODEL_CONFIG"] == "" }, "player and AI receive explicit default model configuration")
         configuration.mode = .hotlap
         try ConfigurationWriter.write(configuration, paths: paths)
         let hotlap = INI(url: cfg.appendingPathComponent("race.ini"))
         try check(hotlap["RACE", "CARS"] == "1" && hotlap.sections["CAR_3"] == nil && hotlap["SESSION_0", "SPAWN_SET"] == "HOTLAP_START", "mode switch clears previous grid")
+        try check(hotlap.sections["CAR_0"]?["MODEL_CONFIG"] == "", "hotlap retains required model configuration after clearing car sections")
         let storage = PaddockStorage(directory: paths.store)
         let preset = DrivePreset(name: "Test", configuration: configuration)
         try storage.save(.init(presets: [preset], sessions: [], selectedPreset: preset.id, draft: configuration))
