@@ -42,3 +42,6 @@ JSON в Application Support записывается атомарно. Ошиб�
 `runtime/steam_cef.py` устанавливает собственный WinMM-прокси из `Bridge/steam-cef.c` только в независимую среду. Он перенаправляет исходные функции WinMM и изменяет импорт командной строки только в браузерном процессе CEF. Это позволяет применить `--in-process-gpu`, который Steam не передаёт из обычных параметров. Системный код WinAPI и файлы Valve не изменяются. Подробности и проверки — в [standalone-runtime](standalone-runtime.md).
 
 `runtime/directx.py` устанавливает игровые prerequisite DLL из Steam-provided Microsoft CABs с проверкой отдельных CAB/DLL SHA-256 и x64 PE. DLL лежат в игровой папке; overrides ограничены `acs.exe`, прежние версии сохраняются в Backups. `runtime/logfiles.py` компактирует только закрытый журнал запуска после заезда.
+
+
+`runtime/session.py` завершает Steam с `-shutdown`, затем закрывает wineserver только с явным WINEPREFIX выбранного сеанса. Вызов Steam пропускается, если его процесс не использует этот prefix. Ожидание ограничено; новый заезд в Paddock блокируется до завершения предыдущего launcher.

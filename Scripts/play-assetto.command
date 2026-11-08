@@ -11,6 +11,15 @@ game_dir="$HOME/Library/Application Support/CrossOver/Bottles/$bottle/drive_c/Pr
 if [[ "$runtime" == standalone ]]; then
     game_dir="$runtime_root/Prefixes/assetto/drive_c/Program Files (x86)/Steam/steamapps/common/assettocorsa"
 fi
+bridge_pid=""
+cleanup_session() {
+    local game_status=$?
+    if [[ -n "$bridge_pid" ]]; then kill -TERM "$bridge_pid" 2>/dev/null || true; fi
+    /usr/bin/python3 "$project_dir/Scripts/paddock-runtime.py" --root "$runtime_root" \
+        shutdown --provider "$runtime" --bottle "$bottle" || true
+    return "$game_status"
+}
+trap cleanup_session EXIT
 mkdir -p build
 [[ -x "$bridge" ]] || swift build --product moza-ac-bridge
 [[ -f Bridge/build/moza-display-launcher.exe ]] || ./Scripts/build-ac-bridge.sh
@@ -38,7 +47,6 @@ else
     "$bridge" --gain "${MOZA_AC_GAIN:-1}" >> build/ac-bridge-live.log 2>&1 &
     bridge_pid=$!
     print "$bridge_pid" > build/ac-bridge.pid
-    trap 'kill -TERM "$bridge_pid" 2>/dev/null || true' EXIT
 fi
 printf 'Assetto Corsa + MOZA R5. Игровая отдача %.0f%%, плавное включение за 2 секунды.\n' "$(( ${MOZA_AC_GAIN:-1} * 100 ))"
 print 'Экран: внешний монитор, отдельное окно без рамок на весь экран.'
