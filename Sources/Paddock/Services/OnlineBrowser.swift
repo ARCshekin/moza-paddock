@@ -16,7 +16,29 @@ final class OnlineBrowser: ObservableObject {
     @Published var password = ""
     @Published var error: String?
     @Published var onlyAvailable = false
+    @Published private(set) var favorites: [FavoriteServer] = []
+    @Published private(set) var favoritesError: String?
+    private let favoritesStore: FavoriteServersStore
+    private var favoritesBlocked = false
     private var request = UUID()
+
+    init(store: URL = PaddockPaths.current.store) {
+        favoritesStore = FavoriteServersStore(directory: store)
+        do { favorites = try favoritesStore.load() }
+        catch { favoritesBlocked = true; favoritesError = "Не удалось прочитать избранное. Файл сохранён без изменений: \(error.localizedDescription)" }
+    }
+    func isFavorite(host: String, port: Int) -> Bool {
+        favorites.contains { $0.id == FavoriteServer(host: host, httpPort: port, name: "").id }
+    }
+    func toggleFavorite(host: String, port: Int, name: String) {
+        guard !favoritesBlocked else { return }
+        let value = FavoriteServer(host: host, httpPort: port, name: name)
+        var next = favorites
+        if let index = next.firstIndex(where: { $0.id == value.id }) { next.remove(at: index) }
+        else { next.append(value) }
+        do { try favoritesStore.save(next); favorites = next; favoritesError = nil }
+        catch { favoritesError = error.localizedDescription }
+    }
 
     static func run<T: Decodable>(_ paths: PaddockPaths, _ arguments: [String]) throws -> T {
         let data = try PaddockController.command("/usr/bin/python3", [paths.project.appendingPathComponent("Scripts/paddock-online.py").path] + arguments, allowFailureJSON: true)

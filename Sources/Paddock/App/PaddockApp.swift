@@ -31,13 +31,14 @@ final class PaddockDelegate: NSObject, NSApplicationDelegate {
 }
 
 enum PaddockTab: String, CaseIterable, Identifiable {
-    case drive = "Заезд", online = "Онлайн", wheel = "Руль и кнопки", presets = "Пресеты", mods = "Моды", records = "Рекорды", runtime = "Запуск"
+    case drive = "Заезд", online = "Каталог серверов", serverHost = "Свой сервер", wheel = "Руль и кнопки", presets = "Пресеты", mods = "Моды", records = "Рекорды", runtime = "Запуск"
     var id: String { rawValue }
     var symbol: String {
-        switch self { case .online: return "network"; case .drive: return "flag.checkered"; case .wheel: return "steeringwheel"; case .presets: return "slider.horizontal.3"; case .mods: return "shippingbox"; case .records: return "stopwatch"; case .runtime: return "desktopcomputer" }
+        switch self { case .serverHost: return "server.rack"; case .online: return "network"; case .drive: return "flag.checkered"; case .wheel: return "steeringwheel"; case .presets: return "slider.horizontal.3"; case .mods: return "shippingbox"; case .records: return "stopwatch"; case .runtime: return "desktopcomputer" }
     }
     var subtitle: String {
         switch self {
+        case .serverHost: return "Тренировка для друзей на своём компьютере"
         case .online: return "Серверы, свободные машины и подключение"
         case .runtime: return "Wine, Steam и независимый запуск игры"
         case .drive: return "Машина, трасса и условия следующего заезда"
@@ -47,6 +48,14 @@ enum PaddockTab: String, CaseIterable, Identifiable {
         case .records: return "Результаты из игры, отдельно для каждой конфигурации"
         }
     }
+}
+
+enum PaddockNavigation {
+    static let groups: [(title: String, symbol: String, items: [PaddockTab])] = [
+        ("Онлайн", "network", [.online, .serverHost]),
+        ("Библиотека", "square.stack", [.presets, .mods, .records]),
+        ("Настройки", "gearshape", [.wheel, .runtime])
+    ]
 }
 
 enum PaddockStyle {
@@ -65,6 +74,7 @@ extension View { func paddockPanel() -> some View { modifier(PaddockPanel()) } }
 struct PaddockShell: View {
     @ObservedObject var model: PaddockController
     @State private var tab = PaddockTab.drive
+    @State private var expanded = Set<String>()
     @State private var saveTask: DispatchWorkItem?
     var body: some View {
         HStack(spacing: 0) {
@@ -84,6 +94,7 @@ struct PaddockShell: View {
                         switch tab {
                         case .drive: DriveView(model: model)
                         case .online: OnlineView(model: model, browser: model.online)
+                        case .serverHost: ServerHostView(model: model, host: model.serverHost)
                         case .wheel: WheelView(model: model)
                         case .presets: PresetsView(model: model)
                         case .mods: ModsView(model: model)
@@ -119,6 +130,29 @@ struct PaddockShell: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: task)
         }
     }
+    private func navigationGroup(_ title: String, symbol: String, items: [PaddockTab]) -> some View {
+        DisclosureGroup(isExpanded: Binding(get: { expanded.contains(title) }, set: { value in
+            if value { expanded.insert(title) } else { expanded.remove(title) }
+        })) {
+            ForEach(items) { item in navigationButton(item).padding(.leading, 8) }
+        } label: {
+            Label(title, systemImage: symbol).font(.system(size: 13, weight: .medium))
+                .foregroundStyle(items.contains(tab) ? Color.white : Color.white.opacity(0.58))
+                .padding(.vertical, 10)
+        }
+    }
+    private func navigationButton(_ item: PaddockTab) -> some View {
+        Button { tab = item } label: {
+            HStack(spacing: 10) {
+                Image(systemName: item.symbol).frame(width: 20)
+                Text(item.rawValue).fontWeight(tab == item ? .semibold : .regular).lineLimit(1)
+                Spacer(minLength: 0)
+            }.font(.system(size: 12)).padding(.horizontal, 10).padding(.vertical, 11)
+                .foregroundStyle(tab == item ? Color.white : Color.white.opacity(0.58))
+                .background(tab == item ? Color.white.opacity(0.085) : Color.clear)
+                .clipShape(RoundedRectangle(cornerRadius: 9))
+        }.buttonStyle(.plain).accessibilityAddTraits(tab == item ? .isSelected : [])
+    }
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 9) {
@@ -128,18 +162,14 @@ struct PaddockShell: View {
                     Text("PADDOCK").font(.system(size: 17, weight: .bold, design: .rounded)).tracking(1)
                 }
             }.padding(.top, 42).padding(.bottom, 40)
-            ForEach(PaddockTab.allCases) { item in
-                Button { tab = item } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: item.symbol).frame(width: 20)
-                        Text(item.rawValue).fontWeight(tab == item ? .semibold : .regular).lineLimit(1)
-                        Spacer()
-                    }.font(.system(size: 13)).padding(.horizontal, 12).padding(.vertical, 12)
-                        .foregroundStyle(tab == item ? Color.white : Color.white.opacity(0.58))
-                        .background(tab == item ? Color.white.opacity(0.085) : Color.clear)
-                        .clipShape(RoundedRectangle(cornerRadius: 9))
-                }.buttonStyle(.plain).padding(.bottom, 5)
-            }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 8) {
+                    navigationButton(.drive)
+                    ForEach(PaddockNavigation.groups, id: \.title) { group in
+                        navigationGroup(group.title, symbol: group.symbol, items: group.items)
+                    }
+                }
+            }.scrollIndicators(.hidden)
             Spacer(minLength: 24)
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 7) {

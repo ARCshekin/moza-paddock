@@ -23,6 +23,26 @@ struct OnlineView: View {
                     Link("Каталог acservers.online", destination: URL(string: "https://acservers.online/servers")!)
                 }.font(.caption).foregroundStyle(.secondary)
             }.paddockPanel()
+            if let error = browser.favoritesError { Text(error).font(.caption).foregroundStyle(.orange) }
+            if !browser.favorites.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    SectionLabel(text: "Избранные серверы")
+                    ForEach(browser.favorites) { favorite in
+                        HStack {
+                            Button { inspect(favorite.id) } label: {
+                                VStack(alignment: .leading) {
+                                    Text(favorite.name)
+                                    Text(favorite.id).font(.caption).foregroundStyle(.secondary)
+                                }
+                            }.buttonStyle(.plain).disabled(browser.loading)
+                            Spacer()
+                            Button { browser.toggleFavorite(host: favorite.host, port: favorite.httpPort, name: favorite.name) } label: {
+                                Image(systemName: "star.fill")
+                            }.buttonStyle(.plain).accessibilityLabel("Убрать из избранного: \(favorite.name)")
+                        }
+                    }
+                }.paddockPanel()
+            }
             if let error = browser.error { Label(error, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.orange).textSelection(.enabled) }
             if let server = browser.detail { details(server) }
             HStack {
@@ -54,7 +74,15 @@ struct OnlineView: View {
     private func inspect(_ address: String) { browser.inspect(address, paths: model.paths, library: model.library) }
     private func details(_ server: OnlineServerDetails) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            SectionLabel(text: "Подключение")
+            HStack {
+                SectionLabel(text: "Подключение")
+                Spacer()
+                Button {
+                    browser.toggleFavorite(host: server.host, port: server.httpPort, name: server.name)
+                } label: {
+                    Label(browser.isFavorite(host: server.host, port: server.httpPort) ? "Убрать из избранного" : "В избранное", systemImage: browser.isFavorite(host: server.host, port: server.httpPort) ? "star.fill" : "star")
+                }
+            }
             HStack { Text(server.name).font(.headline); Spacer(); Text("\(server.latency) мс HTTP").font(.caption).foregroundStyle(.secondary) }
             if let (_, layout) = server.installedTrack(in: model.library) {
                 Label(layout.name, systemImage: "checkmark.circle").font(.caption).foregroundStyle(.green)

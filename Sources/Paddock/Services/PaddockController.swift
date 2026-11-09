@@ -40,7 +40,8 @@ final class PaddockController: ObservableObject {
     var pressed: Set<Int> { live.pressed }
     @Published var pendingBinding: String?
     @Published var gameRunning = false
-    let online = OnlineBrowser()
+    let online: OnlineBrowser
+    let serverHost = ServerHost()
     let timing = SessionLiveState()
     var liveLap: Int? { timing.current }
     var liveBest: Int? { timing.best }
@@ -96,6 +97,7 @@ final class PaddockController: ObservableObject {
 
     init(paths: PaddockPaths = .current) {
         pathsBase = paths; bottle = paths.bottle; runtime = paths.runtime
+        online = OnlineBrowser(store: paths.store)
         do {
             let state = try PaddockStorage(directory: paths.store).load()
             configuration = state.draft; presets = state.presets; sessions = state.sessions; selectedPreset = state.selectedPreset

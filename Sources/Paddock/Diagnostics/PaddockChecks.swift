@@ -101,6 +101,7 @@ enum PaddockChecks {
         try "{\"name\":\"Fixture Layout\",\"length\":\"1000\",\"pitboxes\":\"12\"}".write(to: fixture.appendingPathComponent("content/tracks/test_track/ui/layout/ui_track.json"), atomically: true, encoding: .utf8)
         let scanned = try ContentLibrary.scan(fixture)
         try check(scanned.cars.first?.name == "Fixture Car" && scanned.tracks.first?.layouts.first?.id == "layout" && scanned.tracks.first?.layouts.first?.hasAI == true, "fixture car, layout and AI scanning")
+        try WorkflowChecks.run(root: temp, library: scanned, game: fixture)
         if includeInstalledGame {
             let actual = try ContentLibrary.scan(PaddockPaths.current.game)
             try check(actual.cars.contains { $0.id == "lotus_elise_sc" } && actual.tracks.contains { $0.id == "magione" }, "installed car/track metadata scanning")
