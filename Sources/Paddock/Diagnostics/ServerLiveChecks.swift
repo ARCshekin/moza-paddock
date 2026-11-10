@@ -53,6 +53,11 @@ enum ServerLiveChecks {
         }
         print("PASS real Kunos server INFO + JSON slots through Paddock OnlineBrowser")
         print("PASS UI readiness and global surface checksum validation")
+        guard let connection = host.connectionDetails, connection.localAddress == "127.0.0.1:18081",
+              connection.configuration.racePort == details.racePort else {
+            throw PaddockError("Connection card does not match the real server")
+        }
+        print("PASS real server connection card uses actual HTTP and race ports")
         if let flag = CommandLine.arguments.firstIndex(of: "--server-check-address"), CommandLine.arguments.count > flag + 1 {
             let address = CommandLine.arguments[flag + 1]
             let lan = try inspect(address + ":18081")

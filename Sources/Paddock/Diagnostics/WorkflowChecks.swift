@@ -17,6 +17,7 @@ enum WorkflowChecks {
         defer { close(reserved) }
         var address = sockaddr_in()
         address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size); address.sin_family = sa_family_t(AF_INET)
+        address.sin_addr.s_addr = inet_addr("127.0.0.1")
         let bound = withUnsafePointer(to: &address) {
             $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(reserved, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
         }
@@ -26,9 +27,15 @@ enum WorkflowChecks {
             $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { getsockname(reserved, $0, &length) }
         }
         let occupied = Int(UInt16(bigEndian: address.sin_port))
-        try check(!ServerPorts.available(occupied, udp: false), "server detects an occupied local port")
+        try check(!ServerPorts.available(occupied, udp: false), "server detects a listener bound only to loopback")
         let suggested = ServerPorts.suggested(occupied, udp: false)
         try check(suggested != occupied && ServerPorts.available(suggested, udp: false), "server suggests another port without affecting its owner")
+        var sharedDraft = HostedServerDraft(name: "Friends", car: "test_car", track: "test_track", layout: "layout", password: "private-password", racePort: 19601, httpPort: 18082)
+        let connection = ServerConnectionDetails(configuration: sharedDraft, addresses: [.init(interface: "en0", ip: "192.168.1.42")])
+        sharedDraft.httpPort = 8081; sharedDraft.password = "new-draft"
+        let invite = connection.invitation(ip: "192.168.1.42")
+        try check(connection.localAddress == "127.0.0.1:18082" && invite.contains("192.168.1.42:18082") && invite.contains("19601"), "connection card uses the created server ports, not a later draft")
+        try check(invite.contains("test_track / layout") && !invite.contains("private-password") && !invite.contains("new-draft"), "invitation includes content and keeps passwords separate")
         var draft = HostedServerDraft(car: "test_car", track: "test_track", layout: "layout", slots: 4)
         let (cfg, entries) = try draft.configuration(library: library, adminPassword: "admin-test")
         try check(cfg["SERVER", "CONFIG_TRACK"] == "layout" && cfg["SERVER", "REGISTER_TO_LOBBY"] == "0", "hosted server retains layout and defaults to private LAN")

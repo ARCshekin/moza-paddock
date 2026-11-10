@@ -11,6 +11,7 @@ final class ServerHost: ObservableObject {
     @Published private(set) var running = false
     @Published private(set) var stopping = false
     @Published private(set) var folder: URL?
+    @Published private(set) var connectionDetails: ServerConnectionDetails?
     @Published private(set) var status = "Сервер ещё не создан"
     @Published var error: String?
     private var process: Process?
@@ -26,6 +27,11 @@ final class ServerHost: ObservableObject {
     var connectionHint: String {
         let current = activeDraft ?? draft
         return "На этом Mac: 127.0.0.1:\(current.httpPort). Для друзей: IP этого Mac в локальной сети и порт \(current.httpPort). Для интернета пробросьте \(current.racePort) TCP/UDP и \(current.httpPort) TCP на роутере. При CGNAT нужен внешний IP или VPN с поддержкой входящих подключений."
+    }
+    func refreshConnectionAddresses() {
+        guard var details = connectionDetails else { return }
+        details.addresses = ServerLANAddress.current()
+        connectionDetails = details
     }
     func chooseExecutable() {
         let panel = NSOpenPanel(); panel.message = "Выберите acServer.exe из установленного Assetto Corsa Dedicated Server или папки игры server."
@@ -66,6 +72,7 @@ final class ServerHost: ObservableObject {
                     }
                     try child.run()
                     self.log = log; self.process = child; self.running = true
+                    self.connectionDetails = ServerConnectionDetails(configuration: snapshot, addresses: ServerLANAddress.current())
                     self.status = "Запускаю сервер · проверяю готовность…"
                     self.checkReady(child, paths: paths, port: snapshot.httpPort, deadline: Date().addingTimeInterval(120))
                 } catch { self.error = error.localizedDescription }
