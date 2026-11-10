@@ -18,6 +18,8 @@ final class ServerHost: ObservableObject {
     private var activeDraft: HostedServerDraft?
     private var terminationObserver: AnyCancellable?
     init() {
+        draft.racePort = ServerPorts.suggested(9600, udp: true)
+        draft.httpPort = ServerPorts.suggested(8081, udp: false)
         terminationObserver = NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)
             .sink { [weak self] _ in self?.stop() }
     }
@@ -32,18 +34,24 @@ final class ServerHost: ObservableObject {
     }
     func start(paths: PaddockPaths, library: ContentLibrary) {
         guard !running, !preparing else { return }
+        guard ServerPorts.available(draft.racePort, udp: true), ServerPorts.available(draft.httpPort, udp: false) else {
+            error = "Порт занят или недоступен. Выберите другие порты в «Дополнительно»."; return
+        }
         let snapshot = draft
-        let source = executable ?? paths.game.appendingPathComponent("server/acServer.exe")
+        let selectedSource = executable
         preparing = true; error = nil
         DispatchQueue.global(qos: .userInitiated).async {
-            let result = Result { try Self.prepare(snapshot, source: source, paths: paths, library: library) }
+            let result = Result {
+                let source = try selectedSource ?? Self.install(paths: paths)
+                return try Self.prepare(snapshot, source: source, paths: paths, library: library)
+            }
             DispatchQueue.main.async {
                 self.preparing = false
                 do {
                     let destination = try result.get()
                     self.folder = destination; self.activeDraft = snapshot
                     let child = Process(); child.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
-                    child.arguments = [paths.project.appendingPathComponent("Scripts/paddock-server.py").path,
+                    child.arguments = [paths.serverTool("paddock-server.py").path,
                                        "--root", paths.store.path, "--directory", destination.path]
                     let log = try FileHandle(forWritingTo: destination.appendingPathComponent("server.log"))
                     child.standardOutput = log; child.standardError = log
@@ -58,8 +66,27 @@ final class ServerHost: ObservableObject {
                     }
                     try child.run()
                     self.log = log; self.process = child; self.running = true
-                    self.status = "Процесс запущен · готовность и ошибки смотрите в журнале"
+                    self.status = "Запускаю сервер · проверяю готовность…"
+                    self.checkReady(child, paths: paths, port: snapshot.httpPort, deadline: Date().addingTimeInterval(120))
                 } catch { self.error = error.localizedDescription }
+            }
+        }
+    }
+    private func checkReady(_ child: Process, paths: PaddockPaths, port: Int, deadline: Date) {
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let details: OnlineServerDetails? = try? OnlineBrowser.run(paths, ["inspect", "--address", "127.0.0.1:\(port)"])
+            DispatchQueue.main.async {
+                guard let self, self.process === child, child.isRunning, !self.stopping else { return }
+                if let details, details.racePort == self.activeDraft?.racePort,
+                   details.name == self.activeDraft?.name, details.capacity == self.activeDraft?.slots {
+                    self.status = "Сервер готов · мест: \(details.capacity) · HTTP \(port)"
+                } else if Date() >= deadline {
+                    self.status = "Процесс работает, но сервер не ответил за 120 секунд. Откройте журнал."
+                } else {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+                        self?.checkReady(child, paths: paths, port: port, deadline: deadline)
+                    }
+                }
             }
         }
     }
@@ -73,6 +100,15 @@ final class ServerHost: ObservableObject {
         }
     }
     deinit { if process?.isRunning == true { process?.terminate() }; try? log?.close() }
+
+    private struct InstalledServer: Decodable { let executable: String }
+    static func install(paths: PaddockPaths) throws -> URL {
+        let data = try PaddockController.command("/usr/bin/python3", [
+            paths.serverTool("paddock-server.py").path, "install",
+            "--root", paths.store.path, "--game", paths.game.path])
+        let installed = try JSONDecoder().decode(InstalledServer.self, from: data)
+        return URL(fileURLWithPath: installed.executable)
+    }
 
     static func prepare(_ draft: HostedServerDraft, source: URL, paths: PaddockPaths, library: ContentLibrary) throws -> URL {
         let fm = FileManager.default
@@ -101,6 +137,19 @@ final class ServerHost: ObservableObject {
             let surfaces = destination.appendingPathComponent("content/tracks/\(draft.track)/\(relative)")
             try fm.createDirectory(at: surfaces.deletingLastPathComponent(), withIntermediateDirectories: true)
             try fm.copyItem(at: track.directory.appendingPathComponent(relative), to: surfaces)
+            let game = track.directory.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            let system = destination.appendingPathComponent("system/data/surfaces.ini")
+            try fm.createDirectory(at: system.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try fm.copyItem(at: game.appendingPathComponent("system/data/surfaces.ini"), to: system)
+            let drsRelative = draft.layout.isEmpty ? "data/drs_zones.ini" : "\(draft.layout)/data/drs_zones.ini"
+            let drs = track.directory.appendingPathComponent(drsRelative)
+            if fm.fileExists(atPath: drs.path) {
+                try fm.copyItem(at: drs, to: destination.appendingPathComponent("content/tracks/\(draft.track)/\(drsRelative)"))
+            }
+            for directory in ["setups", "results", "logs"] {
+                try fm.createDirectory(at: destination.appendingPathComponent(directory), withIntermediateDirectories: true)
+            }
+            try Data().write(to: destination.appendingPathComponent("blacklist.txt"))
             try config.save(destination.appendingPathComponent("cfg/server_cfg.ini"))
             try entries.save(destination.appendingPathComponent("cfg/entry_list.ini"))
             for name in ["server_cfg.ini", "entry_list.ini"] {

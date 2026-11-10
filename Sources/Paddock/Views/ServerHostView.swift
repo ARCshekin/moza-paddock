@@ -35,7 +35,7 @@ struct ServerHostView: View {
                             Text("Игра TCP/UDP"); TextField("9600", value: $host.draft.racePort, format: .number.grouping(.never)).frame(width: 90)
                             Text("HTTP"); TextField("8081", value: $host.draft.httpPort, format: .number.grouping(.never)).frame(width: 90)
                         }
-                        Text("acServer.exe: \(host.executable?.path ?? "из папки server выбранной игры")").font(.caption).textSelection(.enabled)
+                        Text("acServer.exe: \(host.executable?.path ?? "автоматическая установка из Steam-копии игры")").font(.caption).textSelection(.enabled)
                         Button("Выбрать acServer.exe…") { host.chooseExecutable() }
                     }.padding(.top, 10)
                 }
@@ -62,7 +62,7 @@ struct ServerHostView: View {
                 Text(host.connectionHint).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                 Text("Подключение: Онлайн → По адресу. У друзей должны быть те же версии машины и трассы. Публикация в лобби сама по себе не открывает порты.").font(.caption).foregroundStyle(.secondary)
             }.paddockPanel()
-            Text("Нужны установленный acServer.exe (Steam → Инструменты → Assetto Corsa Dedicated Server) и бесплатный Wine из Настройки → Запуск. Первый старт создаёт отдельное окружение и может занять больше времени. Эта версия поддерживает одну машину с data.acd и обычную тренировку; CSP, трафик и чемпионаты пока не включены.")
+            Text("Сервер автоматически устанавливается из вашей Steam-копии Assetto Corsa при сборке или первом запуске. Нужен бесплатный Wine из Настройки → Запуск. Первый старт создаёт отдельное окружение и может занять больше времени. Эта версия поддерживает одну машину с data.acd и обычную тренировку; CSP, трафик и чемпионаты пока не включены.")
                 .font(.caption).foregroundStyle(.secondary)
         }
         .onAppear {

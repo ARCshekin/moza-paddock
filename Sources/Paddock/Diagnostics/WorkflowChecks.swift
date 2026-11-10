@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 enum WorkflowChecks {
     static func run(root: URL, library: ContentLibrary, game: URL) throws {
@@ -11,6 +12,23 @@ enum WorkflowChecks {
             do { try action() } catch { failed = true }
             try check(failed, label)
         }
+        let reserved = socket(AF_INET, SOCK_STREAM, 0)
+        guard reserved >= 0 else { throw PaddockError("Cannot create local port fixture") }
+        defer { close(reserved) }
+        var address = sockaddr_in()
+        address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size); address.sin_family = sa_family_t(AF_INET)
+        let bound = withUnsafePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(reserved, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
+        }
+        guard bound == 0, listen(reserved, 1) == 0 else { throw PaddockError("Cannot bind local port fixture") }
+        var length = socklen_t(MemoryLayout<sockaddr_in>.size)
+        _ = withUnsafeMutablePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { getsockname(reserved, $0, &length) }
+        }
+        let occupied = Int(UInt16(bigEndian: address.sin_port))
+        try check(!ServerPorts.available(occupied, udp: false), "server detects an occupied local port")
+        let suggested = ServerPorts.suggested(occupied, udp: false)
+        try check(suggested != occupied && ServerPorts.available(suggested, udp: false), "server suggests another port without affecting its owner")
         var draft = HostedServerDraft(car: "test_car", track: "test_track", layout: "layout", slots: 4)
         let (cfg, entries) = try draft.configuration(library: library, adminPassword: "admin-test")
         try check(cfg["SERVER", "CONFIG_TRACK"] == "layout" && cfg["SERVER", "REGISTER_TO_LOBBY"] == "0", "hosted server retains layout and defaults to private LAN")
@@ -41,10 +59,15 @@ enum WorkflowChecks {
         let surfaces = game.appendingPathComponent("content/tracks/test_track/layout/data/surfaces.ini")
         try fm.createDirectory(at: surfaces.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data("fixture surfaces".utf8).write(to: surfaces)
+        let system = game.appendingPathComponent("system/data/surfaces.ini")
+        try fm.createDirectory(at: system.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("fixture shared surfaces".utf8).write(to: system)
         let folder = try ServerHost.prepare(draft, source: source, paths: paths, library: library)
         let sourceUnchanged = try String(contentsOf: original) == "keep original"
         let physicsCopied = try Data(contentsOf: folder.appendingPathComponent("content/cars/test_car/data.acd")) == Data(contentsOf: physics)
         try check(sourceUnchanged && physicsCopied, "server bundle copies checksums without overwriting source configs")
+        let systemCopied = try Data(contentsOf: folder.appendingPathComponent("system/data/surfaces.ini")) == Data(contentsOf: system)
+        try check(systemCopied, "server bundle retains global surface checksum validation")
         let permissions = try fm.attributesOfItem(atPath: folder.path)[.posixPermissions] as? NSNumber
         try check(permissions?.intValue == 0o700, "server bundle protects passwords with private folder permissions")
         let before = try fm.contentsOfDirectory(atPath: folder.deletingLastPathComponent().path)

@@ -4,6 +4,10 @@ import SwiftUI
 @main
 struct PaddockEntry {
     static func main() {
+        if CommandLine.arguments.contains("--server-live-check") {
+            do { try ServerLiveChecks.run(); exit(0) }
+            catch { fputs("Server live check failed: \(error)\n", stderr); exit(1) }
+        }
         if CommandLine.arguments.contains("--self-test") {
             do { try PaddockChecks.run(includeInstalledGame: !CommandLine.arguments.contains("--without-game")); exit(0) }
             catch { fputs("Paddock check failed: \(error)\n", stderr); exit(1) }
@@ -33,6 +37,7 @@ final class PaddockDelegate: NSObject, NSApplicationDelegate {
 enum PaddockTab: String, CaseIterable, Identifiable {
     case drive = "Заезд", online = "Каталог серверов", serverHost = "Свой сервер", wheel = "Руль и кнопки", presets = "Пресеты", mods = "Моды", records = "Рекорды", runtime = "Запуск"
     var id: String { rawValue }
+    var sidebarTitle: String { self == .online ? "Серверы" : self == .wheel ? "Руль" : rawValue }
     var symbol: String {
         switch self { case .serverHost: return "server.rack"; case .online: return "network"; case .drive: return "flag.checkered"; case .wheel: return "steeringwheel"; case .presets: return "slider.horizontal.3"; case .mods: return "shippingbox"; case .records: return "stopwatch"; case .runtime: return "desktopcomputer" }
     }
@@ -145,7 +150,7 @@ struct PaddockShell: View {
         Button { tab = item } label: {
             HStack(spacing: 10) {
                 Image(systemName: item.symbol).frame(width: 20)
-                Text(item.rawValue).fontWeight(tab == item ? .semibold : .regular).lineLimit(1)
+                Text(item.sidebarTitle).fontWeight(tab == item ? .semibold : .regular).lineLimit(1)
                 Spacer(minLength: 0)
             }.font(.system(size: 12)).padding(.horizontal, 10).padding(.vertical, 11)
                 .foregroundStyle(tab == item ? Color.white : Color.white.opacity(0.58))

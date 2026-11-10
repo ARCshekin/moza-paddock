@@ -41,7 +41,7 @@ final class OnlineBrowser: ObservableObject {
     }
 
     static func run<T: Decodable>(_ paths: PaddockPaths, _ arguments: [String]) throws -> T {
-        let data = try PaddockController.command("/usr/bin/python3", [paths.project.appendingPathComponent("Scripts/paddock-online.py").path] + arguments, allowFailureJSON: true)
+        let data = try PaddockController.command("/usr/bin/python3", [paths.serverTool("paddock-online.py").path] + arguments, allowFailureJSON: true)
         if let failure = try? JSONDecoder().decode(OnlineFailure.self, from: data), let error = failure.error { throw PaddockError(error) }
         return try JSONDecoder().decode(T.self, from: data)
     }

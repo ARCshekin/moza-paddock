@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Run a user-installed Kunos server in its own prefix; no game/Steam shutdown."""
 import argparse
+import json
 import os
 from pathlib import Path
 from runtime.managed import ManagedRuntime
+from runtime.server_install import install
 
 
 def invocation(root, directory):
@@ -21,9 +23,17 @@ def invocation(root, directory):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('action', nargs='?', choices=['run', 'install'], default='run')
     parser.add_argument('--root', type=Path, required=True)
-    parser.add_argument('--directory', type=Path, required=True)
+    parser.add_argument('--game', type=Path)
+    parser.add_argument('--directory', type=Path)
     args = parser.parse_args()
+    if args.action == 'install':
+        executable = install(args.root.resolve(), args.game)
+        print(json.dumps({'executable': str(executable)}))
+        return
+    if args.directory is None:
+        parser.error('--directory is required for run')
     executable, arguments, env = invocation(args.root.resolve(), args.directory.resolve())
     os.chdir(args.directory)
     os.execve(executable, arguments, env)
