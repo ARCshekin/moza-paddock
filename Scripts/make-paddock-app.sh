@@ -29,7 +29,7 @@ fi
 cp build/Paddock.icns "$app/Contents/Resources/Paddock.icns"
 server_tools="$app/Contents/Resources/ServerTools"
 mkdir -p "$server_tools/runtime" "$server_tools/online"
-cp Scripts/paddock-server.py Scripts/paddock-online.py Scripts/paddock-runtime.py "$server_tools/"
+cp Scripts/paddock-server.py Scripts/paddock-online.py Scripts/paddock-runtime.py Scripts/paddock-mods.py "$server_tools/"
 cp Scripts/runtime/*.py Scripts/runtime/*.json "$server_tools/runtime/"
 cp Scripts/online/*.py "$server_tools/online/"
 cat > "$app/Contents/Info.plist" <<'PLIST'
@@ -45,6 +45,7 @@ cat > "$app/Contents/Info.plist" <<'PLIST'
 <key>CFBundleShortVersionString</key><string>1.0</string>
 <key>CFBundleVersion</key><string>1</string>
 <key>LSMinimumSystemVersion</key><string>13.0</string>
+<key>NSLocalNetworkUsageDescription</key><string>Поиск серверов Assetto Corsa в вашей локальной сети.</string>
 <key>NSHighResolutionCapable</key><true/>
 <key>NSHumanReadableCopyright</key><string>Local MOZA / Assetto Corsa companion</string>
 </dict></plist>

@@ -27,6 +27,10 @@ jobs:
         run: python3 Scripts/check-session.py
       - name: Dedicated server isolation checks
         run: python3 Scripts/check-server.py
+      - name: CSP installer checks
+        run: python3 Scripts/check-csp.py
+      - name: LAN discovery checks
+        run: python3 Scripts/check-lan.py
       - name: Online protocol checks
         run: python3 Scripts/check-online.py
       - name: Archive installer checks

@@ -23,6 +23,8 @@ swift build -c release
 python3 Scripts/check-paddock-mods.py
 python3 Scripts/check-runtime.py
 python3 Scripts/check-server.py
+python3 Scripts/check-csp.py
+python3 Scripts/check-lan.py
 ./Scripts/check-ac-bridge.sh
 ```
 
@@ -35,8 +37,11 @@ CI на macOS выполняет эти проверки и проверяет �
 
 ```sh
 .build/release/MozaPaddock --server-live-check
+.build/release/MozaPaddock --server-multi-check
 # Дополнительно проверить адрес интерфейса этого Mac:
 .build/release/MozaPaddock --server-live-check --server-check-address <LAN-IP>
 ```
 
 Требуются установленная игра и Wine. Тест запускает реальный Kunos-сервер на 19600 TCP/UDP и 18081 TCP через тот же ServerHost, что и UI, проверяет INFO/JSON, checksum общего surfaces, статус готовности, остановку и повторный запуск. Порты должны быть свободны. Это не офлайн-тест и не входит в CI. Игра, Steam login и аппаратный FFB не запускаются. Тест оставляет журналы в Application Support/MozaPaddock/Servers, завершает свой сервер при выходе и не публикует его в лобби. Проверка LAN-IP с того же Mac не заменяет вход с другого устройства или из интернета.
+
+Серверные live-проверки теперь используют новый ServerChecks/<UUID>/Prefixes/server и читают игровые файлы через отдельную ссылку. Рабочий игровой prefix и документы не записываются. `--server-multi-check` проверяет две модели и все четыре режима через настоящий Kunos INFO/JSON, а также LAN-обнаружение через loopback UDP. Это не тест входа игрового клиента.

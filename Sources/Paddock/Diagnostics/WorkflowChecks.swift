@@ -30,21 +30,21 @@ enum WorkflowChecks {
         try check(!ServerPorts.available(occupied, udp: false), "server detects a listener bound only to loopback")
         let suggested = ServerPorts.suggested(occupied, udp: false)
         try check(suggested != occupied && ServerPorts.available(suggested, udp: false), "server suggests another port without affecting its owner")
-        var sharedDraft = HostedServerDraft(name: "Friends", car: "test_car", track: "test_track", layout: "layout", password: "private-password", racePort: 19601, httpPort: 18082)
+        var sharedDraft = HostedServerDraft(name: "Friends", cars: [.init(model: "test_car")], track: "test_track", layout: "layout", password: "private-password", racePort: 19601, httpPort: 18082)
         let connection = ServerConnectionDetails(configuration: sharedDraft, addresses: [.init(interface: "en0", ip: "192.168.1.42")])
         sharedDraft.httpPort = 8081; sharedDraft.password = "new-draft"
         let invite = connection.invitation(ip: "192.168.1.42")
         try check(connection.localAddress == "127.0.0.1:18082" && invite.contains("192.168.1.42:18082") && invite.contains("19601"), "connection card uses the created server ports, not a later draft")
         try check(invite.contains("test_track / layout") && !invite.contains("private-password") && !invite.contains("new-draft"), "invitation includes content and keeps passwords separate")
-        var draft = HostedServerDraft(car: "test_car", track: "test_track", layout: "layout", slots: 4)
+        var draft = HostedServerDraft(cars: [.init(model: "test_car", slots: 4)], track: "test_track", layout: "layout")
         let (cfg, entries) = try draft.configuration(library: library, adminPassword: "admin-test")
         try check(cfg["SERVER", "CONFIG_TRACK"] == "layout" && cfg["SERVER", "REGISTER_TO_LOBBY"] == "0", "hosted server retains layout and defaults to private LAN")
         try check(cfg["SERVER", "MAX_CLIENTS"] == "4" && entries.sections.count == 4 && entries["CAR_3", "SKIN"] == "default", "hosted grid matches capacity and installed skins")
         draft.password = "bad\n[SERVER]"
         try rejects("host rejects INI injection") { _ = try draft.configuration(library: library, adminPassword: "x") }
-        draft.password = ""; draft.slots = 13
+        draft.password = ""; draft.cars[0].slots = 13
         try rejects("host rejects capacity exceeding track pits") { _ = try draft.configuration(library: library, adminPassword: "x") }
-        draft.slots = 4; draft.httpPort = draft.racePort
+        draft.cars[0].slots = 4; draft.httpPort = draft.racePort
         try rejects("host rejects conflicting ports") { _ = try draft.configuration(library: library, adminPassword: "x") }
         draft.httpPort = 8081
         var noPits = library
@@ -52,9 +52,9 @@ enum WorkflowChecks {
         noPits.tracks = [TrackAsset(id: existing.id, name: existing.name, directory: existing.directory,
             layouts: [.init(id: "layout", name: "No pits", length: "", preview: nil, outline: nil, pits: 0, hasAI: false)])]
         try rejects("host rejects zero pit metadata without trapping") { _ = try draft.configuration(library: noPits, adminPassword: "x") }
-        draft.car = "missing"
+        draft.cars[0].model = "missing"
         try rejects("host rejects missing content") { _ = try draft.configuration(library: library, adminPassword: "x") }
-        draft.car = "test_car"
+        draft.cars[0].model = "test_car"
         let paths = PaddockPaths(project: root, bottle: "unused", storeOverride: root.appendingPathComponent("host-store"))
         let source = root.appendingPathComponent("server-source/acServer.exe")
         try fm.createDirectory(at: source.deletingLastPathComponent().appendingPathComponent("cfg"), withIntermediateDirectories: true)
@@ -82,6 +82,7 @@ enum WorkflowChecks {
         try rejects("server preparation rolls back on missing track data") { _ = try ServerHost.prepare(draft, source: source, paths: paths, library: library) }
         let after = try fm.contentsOfDirectory(atPath: folder.deletingLastPathComponent().path)
         try check(before == after, "failed server bundle leaves no partial installation")
+        try ServerConfigurationChecks.run(root: root, library: library)
         let store = FavoriteServersStore(directory: root.appendingPathComponent("favorites"))
         let favorite = FavoriteServer(host: "LOCALHOST", httpPort: 8081, name: "Friends")
         try store.save([favorite])

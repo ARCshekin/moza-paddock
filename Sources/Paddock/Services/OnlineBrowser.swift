@@ -1,9 +1,16 @@
 import Combine
 import Foundation
 
+enum OnlineSource: String, CaseIterable, Identifiable {
+    case internet = "Интернет", lan = "LAN"
+    var id: String { rawValue }
+}
+
 private struct OnlineFailure: Decodable { let error: String? }
 
 final class OnlineBrowser: ObservableObject {
+    @Published var source = OnlineSource.internet
+    let lan = LANBrowser()
     @Published var query = ""
     @Published var directAddress = ""
     @Published var servers: [OnlineServer] = []
@@ -45,13 +52,19 @@ final class OnlineBrowser: ObservableObject {
         if let failure = try? JSONDecoder().decode(OnlineFailure.self, from: data), let error = failure.error { throw PaddockError(error) }
         return try JSONDecoder().decode(T.self, from: data)
     }
+    func sourceDidChange() {
+        request = UUID(); loading = false
+        detail = nil; password = ""; error = nil
+    }
     func refresh(paths: PaddockPaths, page: Int = 1) {
         guard !loading else { return }
+        let id = UUID(); request = id
         loading = true; error = nil
         let query = self.query
         DispatchQueue.global(qos: .userInitiated).async {
             let result: Result<OnlineDirectory, Error> = Result { try Self.run(paths, ["list", "--query", query, "--page", String(page)]) }
             DispatchQueue.main.async {
+                guard self.request == id else { return }
                 self.loading = false
                 switch result {
                 case .success(let list): self.servers = list.items; self.total = list.total; self.page = list.page

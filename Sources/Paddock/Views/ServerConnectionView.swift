@@ -30,7 +30,7 @@ struct ServerConnectionView: View {
                 Text("HTTP: \(String(details.configuration.httpPort))")
                 Text("Игра TCP/UDP: \(String(details.configuration.racePort))")
             }.font(.caption).monospacedDigit()
-            Text("Машина: \(details.configuration.car) · Трасса: \(details.configuration.track)\(details.configuration.layout.isEmpty ? "" : " / " + details.configuration.layout)")
+            Text("\(details.configuration.mode.title) · Автомобили: \(details.configuration.carSummary) · Трасса: \(details.configuration.track)\(details.configuration.layout.isEmpty ? "" : " / " + details.configuration.layout)")
                 .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
             if details.configuration.password.isEmpty {
                 Text("Пароль не требуется").font(.caption).foregroundStyle(.secondary)

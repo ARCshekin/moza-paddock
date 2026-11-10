@@ -4,7 +4,7 @@ import SwiftUI
 @main
 struct PaddockEntry {
     static func main() {
-        if CommandLine.arguments.contains("--server-live-check") {
+        if CommandLine.arguments.contains("--server-live-check") || CommandLine.arguments.contains("--server-multi-check") {
             do { try ServerLiveChecks.run(); exit(0) }
             catch { fputs("Server live check failed: \(error)\n", stderr); exit(1) }
         }
@@ -98,7 +98,7 @@ struct PaddockShell: View {
                     Group {
                         switch tab {
                         case .drive: DriveView(model: model)
-                        case .online: OnlineView(model: model, browser: model.online)
+                        case .online: OnlineView(model: model, browser: model.online, lan: model.online.lan)
                         case .serverHost: ServerHostView(model: model, host: model.serverHost)
                         case .wheel: WheelView(model: model)
                         case .presets: PresetsView(model: model)

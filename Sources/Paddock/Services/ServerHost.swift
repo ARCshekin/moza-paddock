@@ -133,12 +133,18 @@ final class ServerHost: ObservableObject {
                 try fm.copyItem(at: dll, to: destination.appendingPathComponent(dll.lastPathComponent))
             }
             // Dedicated servers require physics checksums, not textures or game assets.
-            let car = library.cars.first { $0.id == draft.car }!
-            let carTarget = destination.appendingPathComponent("content/cars/\(draft.car)")
-            try fm.createDirectory(at: carTarget, withIntermediateDirectories: true)
-            let packed = car.directory.appendingPathComponent("data.acd")
-            if fm.fileExists(atPath: packed.path) { try fm.copyItem(at: packed, to: carTarget.appendingPathComponent("data.acd")) }
-            else { throw PaddockError("Для сервера нужен data.acd выбранной машины. Выберите машину с упакованной физикой.") }
+            for selection in draft.cars {
+                guard let car = library.cars.first(where: { $0.id == selection.model }) else {
+                    throw PaddockError("Не установлена машина: \(selection.model).")
+                }
+                let target = destination.appendingPathComponent("content/cars/\(car.id)")
+                try fm.createDirectory(at: target, withIntermediateDirectories: true)
+                let packed = car.directory.appendingPathComponent("data.acd")
+                guard fm.fileExists(atPath: packed.path) else {
+                    throw PaddockError("Для «\(car.name)» нужен data.acd. Выберите машину с упакованной физикой.")
+                }
+                try fm.copyItem(at: packed, to: target.appendingPathComponent("data.acd"))
+            }
             let track = library.tracks.first { $0.id == draft.track }!
             let relative = draft.layout.isEmpty ? "data/surfaces.ini" : "\(draft.layout)/data/surfaces.ini"
             let surfaces = destination.appendingPathComponent("content/tracks/\(draft.track)/\(relative)")

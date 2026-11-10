@@ -3,7 +3,7 @@ import MozaKit
 
 struct INI {
     var sections: [String: [String: String]] = [:]
-    init(_ text: String = "") {
+    init(_ text: String = "", inlineComments: Bool = true) {
         var section = ""
         for line in text.components(separatedBy: .newlines) {
             let value = line.trimmingCharacters(in: .whitespaces)
@@ -14,10 +14,10 @@ struct INI {
             guard let equal = value.firstIndex(of: "=") else { continue }
             let key = value[..<equal].trimmingCharacters(in: .whitespaces)
             let raw = String(value[value.index(after: equal)...])
-            sections[section, default: [:]][key] = raw.components(separatedBy: ";")[0].trimmingCharacters(in: .whitespaces)
+            sections[section, default: [:]][key] = (inlineComments ? raw.components(separatedBy: ";")[0] : raw).trimmingCharacters(in: .whitespaces)
         }
     }
-    init(url: URL) { self.init((try? String(contentsOf: url)) ?? "") }
+    init(url: URL, inlineComments: Bool = true) { self.init((try? String(contentsOf: url)) ?? "", inlineComments: inlineComments) }
     subscript(_ section: String, _ key: String) -> String {
         get { sections[section]?[key] ?? "" }
         set { sections[section, default: [:]][key] = newValue }

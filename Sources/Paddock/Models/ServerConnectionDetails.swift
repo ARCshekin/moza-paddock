@@ -4,6 +4,7 @@ import Darwin
 struct ServerLANAddress: Identifiable, Equatable {
     let interface: String
     let ip: String
+    var broadcast: String? = nil
     var id: String { ip }
 
     static func current() -> [ServerLANAddress] {
@@ -21,7 +22,14 @@ struct ServerLANAddress: Identifiable, Equatable {
             guard getnameinfo(address, socklen_t(address.pointee.sa_len), &buffer, socklen_t(buffer.count), nil, 0, NI_NUMERICHOST) == 0 else { continue }
             let ip = String(cString: buffer)
             guard !ip.hasPrefix("127."), ip != "0.0.0.0", !found.contains(where: { $0.ip == ip }) else { continue }
-            found.append(.init(interface: String(cString: value.ifa_name), ip: ip))
+            var broadcast: String?
+            if value.ifa_flags & UInt32(IFF_BROADCAST) != 0, let target = value.ifa_dstaddr {
+                var buffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+                if getnameinfo(target, socklen_t(target.pointee.sa_len), &buffer, socklen_t(buffer.count), nil, 0, NI_NUMERICHOST) == 0 {
+                    broadcast = String(cString: buffer)
+                }
+            }
+            found.append(.init(interface: String(cString: value.ifa_name), ip: ip, broadcast: broadcast))
         }
         // Prefer Wi-Fi/Ethernet to virtual adapters while retaining VPN addresses.
         return found.sorted {
@@ -41,7 +49,8 @@ struct ServerConnectionDetails {
         ["Сервер: \(configuration.name)",
          "Адрес для Paddock / Content Manager: \(endpoint(ip))",
          "Игровой порт TCP/UDP: \(configuration.racePort)",
-         "Машина: \(configuration.car)",
+         "Режим: \(configuration.mode.title)",
+         "Автомобили и места: \(configuration.carSummary)",
          "Трасса: \(configuration.track)\(configuration.layout.isEmpty ? "" : " / " + configuration.layout)",
          "Пароль: \(configuration.password.isEmpty ? "не требуется" : "нужен — получите у организатора")"].joined(separator: "\n")
     }
