@@ -160,6 +160,14 @@ struct PaddockPaths {
     var game: URL { bottleURL.appendingPathComponent("drive_c/Program Files (x86)/Steam/steamapps/common/assettocorsa") }
     var documents: URL { documentsOverride ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents/Assetto Corsa") }
     var store: URL { storeOverride ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/MozaPaddock") }
+    /// App-owned server tools avoid launching Python from the user's Desktop checkout.
+    func serverTool(_ name: String) -> URL {
+        if let tools = Bundle.main.resourceURL?.appendingPathComponent("ServerTools"),
+           FileManager.default.fileExists(atPath: tools.appendingPathComponent(name).path) {
+            return tools.appendingPathComponent(name)
+        }
+        return project.appendingPathComponent("Scripts/" + name)
+    }
     static var current: PaddockPaths {
         let resource = Bundle.main.resourceURL?.appendingPathComponent("project-path.txt")
         let project = resource.flatMap { try? String(contentsOf: $0).trimmingCharacters(in: .whitespacesAndNewlines) }

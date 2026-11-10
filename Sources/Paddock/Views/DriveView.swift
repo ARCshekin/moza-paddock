@@ -111,30 +111,38 @@ struct ContentPicker: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack { Text(kind == .car ? "Гараж" : "Трассы").font(.title2.bold()); Spacer(); Button("Готово") { dismiss() } }
-            TextField("Поиск по названию…", text: $search).textFieldStyle(.roundedBorder)
+            TextField(kind == .car ? "Название, производитель, класс или тег…" : "Название или страна…", text: $search).textFieldStyle(.roundedBorder)
             ScrollView {
                 LazyVStack(spacing: 8) {
                     if kind == .car {
-                        ForEach(model.library.cars.filter { search.isEmpty || ($0.name + " " + $0.brand + " " + $0.id).localizedCaseInsensitiveContains(search) }) { car in
+                        ForEach(model.library.cars.filter { search.isEmpty || ([$0.name, $0.id] + $0.badges).joined(separator: " ").localizedCaseInsensitiveContains(search) }) { car in
                             Button {
                                 model.configuration.car = car.id; model.configuration.skin = car.skins.first?.id ?? ""; model.configuration.setup = ""; model.persist(); dismiss()
                             } label: {
                                 HStack(spacing: 16) {
                                     AssetPicture(url: car.preview).frame(width: 140, height: 72).clipShape(RoundedRectangle(cornerRadius: 8))
-                                    VStack(alignment: .leading, spacing: 5) { Text(car.name).fontWeight(.semibold); Text([car.brand, car.power, car.weight].filter { !$0.isEmpty }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary) }
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text(car.name).fontWeight(.semibold)
+                                        ContentBadges(values: car.badges)
+                                        Text([car.power, car.weight].filter { !$0.isEmpty }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary)
+                                    }
                                     Spacer()
                                     if model.configuration.car == car.id { Image(systemName: "checkmark.circle.fill").foregroundStyle(PaddockStyle.accent) }
                                 }.padding(8).background(Color.white.opacity(0.04)).clipShape(RoundedRectangle(cornerRadius: 10))
                             }.buttonStyle(.plain)
                         }
                     } else {
-                        ForEach(model.library.tracks.filter { search.isEmpty || ($0.name + " " + $0.id).localizedCaseInsensitiveContains(search) }) { track in
+                        ForEach(model.library.tracks.filter { search.isEmpty || ([$0.name, $0.id] + $0.countries).joined(separator: " ").localizedCaseInsensitiveContains(search) }) { track in
                             Button {
                                 model.configuration.track = track.id; model.configuration.layout = track.layouts.first?.id ?? ""; model.configuration.setup = ""; model.persist(); dismiss()
                             } label: {
                                 HStack(spacing: 16) {
                                     AssetPicture(url: track.layouts.first?.preview, symbol: "road.lanes").frame(width: 140, height: 72).clipShape(RoundedRectangle(cornerRadius: 8))
-                                    VStack(alignment: .leading, spacing: 5) { Text(track.name).fontWeight(.semibold); Text("Конфигураций: \(track.layouts.count)").font(.caption).foregroundStyle(.secondary) }
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text(track.name).fontWeight(.semibold)
+                                        ContentBadges(values: track.countries)
+                                        Text("Конфигураций: \(track.layouts.count)").font(.caption).foregroundStyle(.secondary)
+                                    }
                                     Spacer()
                                     if model.configuration.track == track.id { Image(systemName: "checkmark.circle.fill").foregroundStyle(PaddockStyle.accent) }
                                 }.padding(8).background(Color.white.opacity(0.04)).clipShape(RoundedRectangle(cornerRadius: 10))
@@ -173,6 +181,22 @@ struct DriveLaunchBar: View {
                 Text("\(model.configuration.angle)° · FFB \(Int(model.configuration.gain * 100))%")
                 Text(model.activePreset?.name ?? "Без пресета").foregroundStyle(PaddockStyle.accent).lineLimit(1)
             }.font(.caption).foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// Adaptive rows keep long mod tags readable within the selection sheet.
+struct ContentBadges: View {
+    let values: [String]
+    var body: some View {
+        if !values.isEmpty {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), alignment: .leading)], alignment: .leading, spacing: 4) {
+                ForEach(values, id: \.self) { value in
+                    Text(value).font(.caption2).foregroundStyle(PaddockStyle.accent)
+                        .padding(.horizontal, 7).padding(.vertical, 3)
+                        .background(PaddockStyle.accent.opacity(0.1), in: Capsule())
+                }
+            }
         }
     }
 }

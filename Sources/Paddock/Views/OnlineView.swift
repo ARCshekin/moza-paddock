@@ -3,58 +3,149 @@ import SwiftUI
 struct OnlineView: View {
     @ObservedObject var model: PaddockController
     @ObservedObject var browser: OnlineBrowser
+    @ObservedObject var lan: LANBrowser
+    private var busy: Bool { browser.loading || browser.source == .lan && lan.loading }
+    private var listedServers: [OnlineServer] { browser.source == .internet ? browser.servers : lan.servers }
+    private var filtered: [OnlineServer] { browser.filteredServers(in: model.library, servers: listedServers) }
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
+            Picker("Каталог серверов", selection: $browser.source) {
+                ForEach(OnlineSource.allCases) { Text($0.rawValue).tag($0) }
+            }.pickerStyle(.segmented)
+            if browser.source == .lan {
+                VStack(alignment: .leading, spacing: 12) {
+                    SectionLabel(text: "Серверы локальной сети")
+                    HStack {
+                        TextField("Игровые UDP-порты · 9600-9610", text: $lan.ports).textFieldStyle(.roundedBorder)
+                            .onSubmit { lan.refresh(paths: model.paths) }
+                        Button("Найти в LAN") { lan.refresh(paths: model.paths) }.disabled(busy)
+                        if lan.loading { ProgressView().controlSize(.small) }
+                    }
+                    Text("Поиск на этом Mac и через broadcast вашей сети. Для другого игрового порта измените диапазон; адрес и HTTP-порт также можно ввести ниже.").font(.caption).foregroundStyle(.secondary)
+                    if let error = lan.error { Text(error).font(.caption).foregroundStyle(.orange) }
+                }.paddockPanel()
+            }
             VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    TextField("Название сервера, машина или трасса", text: $browser.query).textFieldStyle(.roundedBorder)
-                        .onSubmit { browser.refresh(paths: model.paths) }
-                    Button("Найти") { browser.refresh(paths: model.paths) }.disabled(browser.loading)
-                    if browser.loading { ProgressView().controlSize(.small) }
+                if browser.source == .internet {
+                    HStack {
+                        TextField("Название сервера, машина или трасса", text: $browser.query).textFieldStyle(.roundedBorder)
+                            .onSubmit { browser.refresh(paths: model.paths) }
+                        Button("Найти") { browser.refresh(paths: model.paths) }.disabled(busy)
+                        if browser.loading { ProgressView().controlSize(.small) }
+                    }
                 }
                 HStack {
                     TextField("Адрес или ссылка Content Manager · host:8081", text: $browser.directAddress).textFieldStyle(.roundedBorder)
                         .onSubmit { inspect(browser.directAddress) }
-                    Button("По адресу") { inspect(browser.directAddress) }.disabled(browser.loading || browser.directAddress.isEmpty)
+                    Button("По адресу") { inspect(browser.directAddress) }.disabled(busy || browser.directAddress.isEmpty)
                 }
                 HStack {
+                    TextField("Фильтр по трассе", text: $browser.trackFilter).textFieldStyle(.roundedBorder)
+                    TextField("Фильтр по автомобилю", text: $browser.carFilter).textFieldStyle(.roundedBorder)
+                }
+                HStack {
+                    Toggle("Есть все моды", isOn: $browser.onlyInstalled).toggleStyle(.checkbox)
+                        .disabled(busy)
+                        .onChange(of: browser.onlyInstalled) { enabled in
+                            if enabled && browser.source == .internet { browser.refresh(paths: model.paths, page: browser.page) }
+                        }
                     Toggle("Есть места", isOn: $browser.onlyAvailable).toggleStyle(.checkbox)
                     Spacer()
-                    Link("Каталог acservers.online", destination: URL(string: "https://acservers.online/servers")!)
+                    if browser.source == .internet {
+                        Link("Каталог acservers.online", destination: URL(string: "https://acservers.online/servers")!)
+                    }
                 }.font(.caption).foregroundStyle(.secondary)
+                Text("Фильтры применяются к текущей странице каталога или результатам LAN-поиска. «Есть все моды» проверяет наличие трассы и всех машин через INFO; версии проверяет игра.")
+                    .font(.caption2).foregroundStyle(.secondary)
             }.paddockPanel()
+            if let error = browser.favoritesError { Text(error).font(.caption).foregroundStyle(.orange) }
+            if !browser.favorites.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    SectionLabel(text: "Избранные серверы")
+                    ForEach(browser.favorites) { favorite in
+                        HStack {
+                            Button { inspect(favorite.id) } label: {
+                                VStack(alignment: .leading) {
+                                    Text(favorite.name)
+                                    Text(favorite.id).font(.caption).foregroundStyle(.secondary)
+                                }
+                            }.buttonStyle(.plain).disabled(busy)
+                            Spacer()
+                            Button { browser.toggleFavorite(host: favorite.host, port: favorite.httpPort, name: favorite.name) } label: {
+                                Image(systemName: "star.fill")
+                            }.buttonStyle(.plain).accessibilityLabel("Убрать из избранного: \(favorite.name)")
+                        }
+                    }
+                }.paddockPanel()
+            }
             if let error = browser.error { Label(error, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.orange).textSelection(.enabled) }
             if let server = browser.detail { details(server) }
-            HStack {
-                Text("Найдено: \(browser.total) · страница \(browser.page)").font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                Button("Назад") { browser.refresh(paths: model.paths, page: browser.page - 1) }.disabled(browser.loading || browser.page <= 1)
-                Button("Далее") { browser.refresh(paths: model.paths, page: browser.page + 1) }.disabled(browser.loading || browser.page * 10 >= browser.total)
+            if browser.source == .internet {
+                HStack {
+                    Text("В каталоге: \(browser.total) · страница \(browser.page) · показано: \(filtered.count)").font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Назад") { browser.refresh(paths: model.paths, page: browser.page - 1) }.disabled(busy || browser.page <= 1)
+                    Button("Далее") { browser.refresh(paths: model.paths, page: browser.page + 1) }.disabled(busy || browser.page * 10 >= browser.total)
+                }
+            } else {
+                Text("LAN-серверов: \(lan.servers.count)").font(.caption).foregroundStyle(.secondary)
+                if lan.searched && lan.servers.isEmpty && !lan.loading {
+                    Text("Серверы не найдены. Проверьте сеть и порты или введите IP вручную. Некоторые VPN и Wi-Fi с изоляцией клиентов не пропускают broadcast.").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            if browser.source == .internet && !busy && filtered.isEmpty {
+                Text("На этой странице нет серверов по выбранным фильтрам. Измените фильтры или перейдите на следующую страницу.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if browser.onlyInstalled && !busy {
+                let unknown = listedServers.filter { $0.content == nil }.count
+                if unknown > 0 {
+                    Text("Не удалось проверить контент серверов: \(unknown). Они скрыты фильтром «Есть все моды».")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
             LazyVStack(spacing: 10) {
-                ForEach(browser.servers.filter { !browser.onlyAvailable || $0.online && $0.clients < $0.capacity }) { server in
+                ForEach(filtered) { server in
                     Button { inspect(server.id) } label: {
                         HStack(spacing: 14) {
                             Image(systemName: server.password ? "lock.fill" : "network").foregroundStyle(server.online ? Color.green : Color.gray)
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(server.name).font(.system(size: 14, weight: .semibold)).lineLimit(2)
                                 Text(server.track).font(.caption).foregroundStyle(.secondary)
+                                Text(server.carNames.joined(separator: " · ")).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
                             }
                             Spacer()
                             Text("\(server.clients)/\(server.capacity)").monospacedDigit()
                             Image(systemName: "chevron.right").foregroundStyle(.secondary)
                         }.frame(maxWidth: .infinity, alignment: .leading).paddockPanel()
-                    }.buttonStyle(.plain).disabled(browser.loading)
+                    }.buttonStyle(.plain).disabled(busy)
                 }
             }
-            Text("Список — снимок публичного каталога. Перед входом обновляются данные выбранного сервера. Сейчас доступны обычные pickup-серверы; бронирование и вход на CSP-серверы ещё в разработке.")
+            Text("Перед входом обновляются данные сервера. Сейчас доступны обычные pickup-серверы; бронирование и вход на CSP-серверы ещё в разработке.")
                 .font(.caption).foregroundStyle(.secondary)
-        }.onAppear { if browser.servers.isEmpty && !browser.loading { browser.refresh(paths: model.paths) } }
+        }.onAppear { refreshSelected() }
+            .onChange(of: browser.source) { _ in
+                browser.sourceDidChange()
+                refreshSelected()
+            }
+    }
+    private func refreshSelected() {
+        if browser.source == .internet {
+            if browser.servers.isEmpty && !browser.loading { browser.refresh(paths: model.paths) }
+        } else if !lan.searched && !lan.loading { lan.refresh(paths: model.paths) }
     }
     private func inspect(_ address: String) { browser.inspect(address, paths: model.paths, library: model.library) }
     private func details(_ server: OnlineServerDetails) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            SectionLabel(text: "Подключение")
+            HStack {
+                SectionLabel(text: "Подключение")
+                Spacer()
+                Button {
+                    browser.toggleFavorite(host: server.host, port: server.httpPort, name: server.name)
+                } label: {
+                    Label(browser.isFavorite(host: server.host, port: server.httpPort) ? "Убрать из избранного" : "В избранное", systemImage: browser.isFavorite(host: server.host, port: server.httpPort) ? "star.fill" : "star")
+                }
+            }
             HStack { Text(server.name).font(.headline); Spacer(); Text("\(server.latency) мс HTTP").font(.caption).foregroundStyle(.secondary) }
             if let (_, layout) = server.installedTrack(in: model.library) {
                 Label(layout.name, systemImage: "checkmark.circle").font(.caption).foregroundStyle(.green)
@@ -76,7 +167,7 @@ struct OnlineView: View {
             if server.csp { Text("Требуется CSP · подключение в этой версии пока недоступно").font(.caption).foregroundStyle(.orange) }
             if !server.pickup { Text("Требуется бронирование места").font(.caption).foregroundStyle(.orange) }
             HStack {
-                Button("Обновить места") { inspect("\(server.host):\(server.httpPort)") }.disabled(browser.loading)
+                Button("Обновить места") { inspect("\(server.host):\(server.httpPort)") }.disabled(busy)
                 Spacer()
                 if model.gameRunning { Button("Завершить заезд") { model.stopGame() } }
                 Button("Подключиться") {
@@ -84,7 +175,7 @@ struct OnlineView: View {
                     model.launch(online: connection)
                     browser.password = ""
                 }.buttonStyle(.borderedProminent)
-                    .disabled(browser.loading || model.operation != nil || model.gameRunning || server.csp || !server.pickup ||
+                    .disabled(busy || model.operation != nil || model.gameRunning || server.csp || !server.pickup ||
                               server.installedTrack(in: model.library) == nil || !server.missingCars(in: model.library).isEmpty || !model.library.cars.contains { $0.id == browser.car } || (server.free[browser.car] ?? 0) == 0)
             }
         }.paddockPanel()

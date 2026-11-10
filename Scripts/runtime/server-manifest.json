@@ -1,0 +1,11 @@
+{
+  "version": "kunos-steam-14923034-e786e4903373",
+  "filename": "acServer.exe",
+  "sha256": "e786e4903373600a21a5f325f08fef53c234c268f78ea030b059fbfe40c4cb03",
+  "source": "https://store.steampowered.com/app/244210/Assetto_Corsa/",
+  "steam_app": 244210,
+  "steam_build": "14923034",
+  "license": "Proprietary Kunos Simulazioni / 505 Games; local import from the user's Steam installation only. Not redistributed by Paddock.",
+  "server_version": "1.15",
+  "protocol": 202
+}

@@ -3,7 +3,7 @@ import MozaKit
 
 struct INI {
     var sections: [String: [String: String]] = [:]
-    init(_ text: String = "") {
+    init(_ text: String = "", inlineComments: Bool = true) {
         var section = ""
         for line in text.components(separatedBy: .newlines) {
             let value = line.trimmingCharacters(in: .whitespaces)
@@ -14,10 +14,10 @@ struct INI {
             guard let equal = value.firstIndex(of: "=") else { continue }
             let key = value[..<equal].trimmingCharacters(in: .whitespaces)
             let raw = String(value[value.index(after: equal)...])
-            sections[section, default: [:]][key] = raw.components(separatedBy: ";")[0].trimmingCharacters(in: .whitespaces)
+            sections[section, default: [:]][key] = (inlineComments ? raw.components(separatedBy: ";")[0] : raw).trimmingCharacters(in: .whitespaces)
         }
     }
-    init(url: URL) { self.init((try? String(contentsOf: url)) ?? "") }
+    init(url: URL, inlineComments: Bool = true) { self.init((try? String(contentsOf: url)) ?? "", inlineComments: inlineComments) }
     subscript(_ section: String, _ key: String) -> String {
         get { sections[section]?[key] ?? "" }
         set { sections[section, default: [:]][key] = newValue }
@@ -73,10 +73,12 @@ enum ConfigurationWriter {
         }
         var race = INI(url: cfg.appendingPathComponent("race.ini"))
         for key in Array(race.sections.keys) where key.hasPrefix("SESSION_") || key.hasPrefix("CAR_") { race.sections.removeValue(forKey: key) }
+        race["HEADER", "VERSION"] = "2"
         let count = c.mode == .race ? c.opponents + 1 : 1
         for (key, value) in ["TRACK": c.track, "CONFIG_TRACK": c.layout, "MODEL": c.car, "MODEL_CONFIG": "", "SKIN": c.skin, "CARS": "\(count)", "AI_LEVEL": "\(c.ai)", "RACE_LAPS": "\(c.laps)", "PENALTIES": c.penalties ? "1" : "0", "DRIFT_MODE": c.mode == .drift ? "1" : "0"] { race["RACE", key] = value }
         for i in 0..<count {
             race["CAR_\(i)", "MODEL"] = i == 0 ? "-" : c.car
+            race["CAR_\(i)", "MODEL_CONFIG"] = ""
             race["CAR_\(i)", "SKIN"] = c.skin
             race["CAR_\(i)", "DRIVER_NAME"] = i == 0 ? "Driver" : "AI \(i)"
             race["CAR_\(i)", "AI_LEVEL"] = "\(c.ai)"

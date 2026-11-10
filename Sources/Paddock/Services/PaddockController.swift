@@ -40,7 +40,8 @@ final class PaddockController: ObservableObject {
     var pressed: Set<Int> { live.pressed }
     @Published var pendingBinding: String?
     @Published var gameRunning = false
-    let online = OnlineBrowser()
+    let online: OnlineBrowser
+    let serverHost = ServerHost()
     let timing = SessionLiveState()
     var liveLap: Int? { timing.current }
     var liveBest: Int? { timing.best }
@@ -96,6 +97,7 @@ final class PaddockController: ObservableObject {
 
     init(paths: PaddockPaths = .current) {
         pathsBase = paths; bottle = paths.bottle; runtime = paths.runtime
+        online = OnlineBrowser(store: paths.store)
         do {
             let state = try PaddockStorage(directory: paths.store).load()
             configuration = state.draft; presets = state.presets; sessions = state.sessions; selectedPreset = state.selectedPreset
@@ -303,6 +305,7 @@ final class PaddockController: ObservableObject {
                     }
                     try OnlineConnection(server: fresh, car: connection.car, player: connection.player, password: connection.password).validate()
                 }
+                try ContentRequirements.validate(car, game: paths.game)
                 try Self.ensureSteam(paths: paths)
                 try Self.setWheelAngle(snapshot.angle)
                 if connection != nil { OnlineConnection.clearCredentials(paths: paths) }
@@ -354,6 +357,8 @@ final class PaddockController: ObservableObject {
                                         self.error = "Другой запуск уже готовит заезд. Дождитесь его завершения."
                                     } else if process.terminationStatus == 5 {
                                         self.error = "Steam ещё не готов к запуску игры. Проверьте вход в аккаунт и повторите запуск."
+                                    } else if process.terminationStatus == 99 {
+                                        self.error = "Игра аварийно завершилась при загрузке заезда (код 99). Журнал игры: \(paths.documents.appendingPathComponent("logs/log.txt").path). Журнал запуска: \(log.path)"
                                     } else {
                                     self.error = "Игра завершилась с кодом \(process.terminationStatus). Проверьте Steam и подключение внешнего экрана. Журнал: \(log.path)"
                                     }
@@ -385,8 +390,8 @@ final class PaddockController: ObservableObject {
 
     private static func closeSession(paths: PaddockPaths, online: Bool) {
         if online { OnlineConnection.clearCredentials(paths: paths) }
-        _ = try? command("/usr/bin/python3", [paths.project.appendingPathComponent("Scripts/paddock-runtime.py").path,
-            "--root", paths.store.path, "shutdown", "--provider", paths.runtime.rawValue, "--bottle", paths.bottle])
+        // A preparation failure must not close Steam that the user is still using.
+        // The owned bridge is stopped by the shell launcher if it was started.
     }
 
     func stopGame() {

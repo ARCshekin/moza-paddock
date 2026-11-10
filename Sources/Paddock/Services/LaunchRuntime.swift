@@ -36,7 +36,7 @@ extension PaddockController {
     func refreshRuntimeStatus() {
         let paths = self.paths
         DispatchQueue.global(qos: .utility).async {
-            let result = try? Self.command("/usr/bin/python3", [paths.project.appendingPathComponent("Scripts/paddock-runtime.py").path,
+            let result = try? Self.command("/usr/bin/python3", [paths.serverTool("paddock-runtime.py").path,
                                                              "--root", paths.store.path, "status"])
             let status = result.flatMap { try? JSONDecoder().decode(RuntimeStatus.self, from: $0) }
             DispatchQueue.main.async { self.runtimeStatus = status }

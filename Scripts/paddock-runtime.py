@@ -14,6 +14,7 @@ def main():
     parser.add_argument('--root', type=Path, default=DEFAULT_ROOT)
     sub = parser.add_subparsers(dest='action', required=True)
     sub.add_parser('status')
+    sub.add_parser('install-csp')
     shutdown = sub.add_parser('shutdown')
     shutdown.add_argument('--provider', choices=['standalone', 'crossover'], default='standalone')
     shutdown.add_argument('--bottle', default='Steam-3')
@@ -30,7 +31,10 @@ def main():
     wine.add_argument('arguments', nargs=argparse.REMAINDER)
     args = parser.parse_args()
     runtime = ManagedRuntime(args.root)
-    if args.action == 'shutdown':
+    if args.action == 'install-csp':
+        from runtime.csp import install
+        print(json.dumps(install(runtime), sort_keys=True))
+    elif args.action == 'shutdown':
         from runtime.session import shutdown
         if args.provider == 'crossover':
             runtime.prefix = Path.home() / 'Library/Application Support/CrossOver/Bottles' / args.bottle
