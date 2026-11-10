@@ -45,6 +45,9 @@ enum PaddockChecks {
         let cfg = paths.documents.appendingPathComponent("cfg")
         let controls = INI(url: cfg.appendingPathComponent("controls.ini"))
         let race = INI(url: cfg.appendingPathComponent("race.ini"))
+        try check(race["HEADER", "VERSION"] == "2", "fresh race configuration declares the AC session format")
+        try check((0..<4).allSatisfy { race.sections["CAR_\($0)"]?["MODEL_CONFIG"] == "" }, "player and AI entries include required MODEL_CONFIG even when empty")
+        try check(race["CAR_0", "MODEL"] == "-", "player entry preserves AC model fallback to RACE/MODEL")
         try check(controls["GEARUP", "BUTTON"] == "13" && controls["GEARDN", "BUTTON"] == "12", "HID buttons become zero-based AC bindings")
         try check(controls["STEER", "LOCK"] == "540" && controls["ACTION_HORN", "JOY"] == "-1", "wheel angle and unassigned actions")
         try check(race["RACE", "CARS"] == "4" && race["CAR_3", "MODEL"] == configuration.car && race["SESSION_0", "TYPE"] == "3", "race mode creates AI grid")
@@ -102,6 +105,14 @@ enum PaddockChecks {
         let scanned = try ContentLibrary.scan(fixture)
         try check(scanned.cars.first?.name == "Fixture Car" && scanned.tracks.first?.layouts.first?.id == "layout" && scanned.tracks.first?.layouts.first?.hasAI == true, "fixture car, layout and AI scanning")
         try WorkflowChecks.run(root: temp, library: scanned, game: fixture)
+        try check(ContentRequirements.minimumCSP(in: "Minimum CSP Version: 0.2.7<br>Version: 3.2") == "0.2.7", "explicit RSS CSP requirement parsed")
+        try check(ContentRequirements.minimumCSP(in: "Minimum CSP Version 0.2.7.") == "0.2.7", "RSS GT-MX CSP requirement parsed")
+        try check(ContentRequirements.minimumCSP(in: "Optional CSP lighting support") == nil, "optional CSP visuals do not become a mandatory dependency")
+        var dependent = scanned.cars[0]; dependent.requiredCSP = "0.2.7"
+        var missingCSP = false
+        do { try ContentRequirements.validate(dependent, game: fixture) } catch { missingCSP = error.localizedDescription.contains("0.2.7") }
+        try check(missingCSP, "missing CSP rejected before changing Steam or live game configuration")
+        try ContentRequirements.validate(scanned.cars[0], game: fixture)
         if includeInstalledGame {
             let actual = try ContentLibrary.scan(PaddockPaths.current.game)
             try check(actual.cars.contains { $0.id == "lotus_elise_sc" } && actual.tracks.contains { $0.id == "magione" }, "installed car/track metadata scanning")

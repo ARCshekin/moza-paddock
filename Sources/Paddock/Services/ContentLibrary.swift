@@ -4,6 +4,7 @@ struct CarSkin: Identifiable { let id: String; let name: String; let preview: UR
 struct CarAsset: Identifiable {
     let id: String; let name: String; let brand: String; let power: String; let weight: String
     let directory: URL; let skins: [CarSkin]
+    var requiredCSP: String? = nil
     var preview: URL? { skins.first?.preview }
 }
 struct TrackLayout: Identifiable { let id: String; let name: String; let length: String; let preview: URL?; let outline: URL?; let pits: Int; let hasAI: Bool }
@@ -47,7 +48,7 @@ struct ContentLibrary {
                                preview: existing(skin.appendingPathComponent("preview.jpg")) ?? existing(skin.appendingPathComponent("preview.png")))
             }
             result.cars.append(.init(id: id, name: metadata(ui, key: "name").nonempty ?? id,
-                                     brand: metadata(ui, key: "brand"), power: metadata(ui, key: "bhp"), weight: metadata(ui, key: "weight"), directory: folder, skins: skins))
+                                     brand: metadata(ui, key: "brand"), power: metadata(ui, key: "bhp"), weight: metadata(ui, key: "weight"), directory: folder, skins: skins, requiredCSP: ContentRequirements.minimumCSP(in: metadata(ui, key: "description"))))
         }
         for folder in folders(game.appendingPathComponent("content/tracks")) {
             let ui = folder.appendingPathComponent("ui")

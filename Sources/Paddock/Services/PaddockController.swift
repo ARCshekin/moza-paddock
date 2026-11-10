@@ -305,6 +305,7 @@ final class PaddockController: ObservableObject {
                     }
                     try OnlineConnection(server: fresh, car: connection.car, player: connection.player, password: connection.password).validate()
                 }
+                try ContentRequirements.validate(car, game: paths.game)
                 try Self.ensureSteam(paths: paths)
                 try Self.setWheelAngle(snapshot.angle)
                 if connection != nil { OnlineConnection.clearCredentials(paths: paths) }
@@ -356,6 +357,8 @@ final class PaddockController: ObservableObject {
                                         self.error = "Другой запуск уже готовит заезд. Дождитесь его завершения."
                                     } else if process.terminationStatus == 5 {
                                         self.error = "Steam ещё не готов к запуску игры. Проверьте вход в аккаунт и повторите запуск."
+                                    } else if process.terminationStatus == 99 {
+                                        self.error = "Игра аварийно завершилась при загрузке заезда (код 99). Журнал игры: \(paths.documents.appendingPathComponent("logs/log.txt").path). Журнал запуска: \(log.path)"
                                     } else {
                                     self.error = "Игра завершилась с кодом \(process.terminationStatus). Проверьте Steam и подключение внешнего экрана. Журнал: \(log.path)"
                                     }
