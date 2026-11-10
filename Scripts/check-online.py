@@ -4,15 +4,24 @@ import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 from unittest.mock import patch
-from online.servers import directory_document, endpoint, inspect, clear_session
+from online.servers import directory, directory_document, endpoint, inspect, clear_session
 
 item = dict(joinUrl='acmanager://race/online/join?ip=127.0.0.1&httpPort=8081',
-            name='Test', track='Magione', players=1, capacity=12, status='Online')
+            name='Test', track='Magione', carNames=['BMW M3'], players=1, capacity=12, status='Online')
 result = {'items': [item], 'total': 1, 'page': 2}
 stream = '1:["$","view",null,{"initialResult":' + json.dumps(result) + '}]'
 html = '<script>self.__VINEXT_RSC_CHUNKS__.push(' + json.dumps(stream) + ')</script>'
 parsed = directory_document(html)
 assert parsed['page'] == 2 and parsed['items'][0]['id'] == '127.0.0.1:8081'
+assert parsed['items'][0]['carNames'] == ['BMW M3']
+with patch('online.servers.fetch', side_effect=[html, json.dumps(dict(track='magione', cars=['bmw_m3'], tport=9600))]) as request:
+    checked = directory(check_content=True)
+    assert checked['items'][0]['content'] == dict(track='magione', cars=['bmw_m3'])
+    assert request.call_args.args[0].endswith('/INFO')
+with patch('online.servers.fetch', side_effect=[html, TimeoutError()]):
+    assert 'content' not in directory(check_content=True)['items'][0]
+with patch('online.servers.fetch', return_value=html) as request:
+    assert 'content' not in directory()['items'][0] and request.call_count == 1
 assert endpoint('https://acstuff.club/s/q:race/online/join?ip=example.com&httpPort=9090') == ('example.com', 9090)
 for invalid in ('http://user:pass@example.com', 'file:///tmp/a', 'host:70000', 'host:0', 'host\nname:8081'):
     try:

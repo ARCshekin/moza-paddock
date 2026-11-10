@@ -50,6 +50,8 @@ try:
     assert result['total'] == 1
     assert result['items'][0]['httpPort'] == http.server_port
     assert result['items'][0]['name'] == 'LAN fixture' and result['items'][0]['capacity'] == 2
+    assert result['items'][0]['content']['track'] == result['items'][0]['track']
+    assert result['items'][0]['content']['cars'] == result['items'][0]['carNames']
 finally:
     worker.join(timeout=2); probe.close(); http.shutdown(); http.server_close()
 print('PASS LAN UDP protocol, unsigned HTTP ports, bounds, duplicate filtering and real INFO/JSON verification')

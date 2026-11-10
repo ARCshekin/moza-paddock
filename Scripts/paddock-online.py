@@ -14,6 +14,7 @@ def main():
     parser.add_argument('--documents')
     parser.add_argument('--ports', default='9600-9610')
     parser.add_argument('--target', action='append')
+    parser.add_argument('--check-content', action='store_true')
     args = parser.parse_args()
     try:
         if args.action == 'clear-session':
@@ -25,7 +26,7 @@ def main():
             from online.lan import discover
             result = discover(args.ports, args.target)
         else:
-            result = directory(args.query, args.page) if args.action == 'list' else inspect(args.address)
+            result = directory(args.query, args.page, args.check_content) if args.action == 'list' else inspect(args.address)
         print(json.dumps(result))
         return 0
     except Exception as error:

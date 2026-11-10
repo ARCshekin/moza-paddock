@@ -5,10 +5,14 @@ struct CarAsset: Identifiable {
     let id: String; let name: String; let brand: String; let power: String; let weight: String
     let directory: URL; let skins: [CarSkin]
     var requiredCSP: String? = nil
+    var carClass = ""; var country = ""; var tags: [String] = []
+    var badges: [String] { ContentLibrary.uniqueTags([brand, carClass, country] + tags) }
     var preview: URL? { skins.first?.preview }
 }
-struct TrackLayout: Identifiable { let id: String; let name: String; let length: String; let preview: URL?; let outline: URL?; let pits: Int; let hasAI: Bool }
-struct TrackAsset: Identifiable { let id: String; let name: String; let directory: URL; let layouts: [TrackLayout] }
+struct TrackLayout: Identifiable { let id: String; let name: String; let length: String; let preview: URL?; let outline: URL?; let pits: Int; let hasAI: Bool; var country = "" }
+struct TrackAsset: Identifiable { let id: String; let name: String; let directory: URL; let layouts: [TrackLayout]
+    var countries: [String] { ContentLibrary.uniqueTags(layouts.map(\.country)) }
+}
 struct WeatherAsset: Identifiable { let id: String; let name: String }
 
 struct ContentLibrary {
@@ -26,6 +30,24 @@ struct ContentLibrary {
         let raw = String(text[range])
         if let decoded = try? JSONSerialization.jsonObject(with: Data(("[\"" + raw + "\"]").utf8)) as? [String] { return decoded.first ?? raw }
         return raw
+    }
+    static func uniqueTags(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        return values.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && seen.insert($0.lowercased()).inserted }
+    }
+    static func tags(_ url: URL) -> [String] {
+        guard let data = try? Data(contentsOf: url) else { return [] }
+        if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let tags = object["tags"] as? [String] {
+            return uniqueTags(tags)
+        }
+        // Keep tags available for legacy JSON with literal newlines in descriptions.
+        guard let text = String(data: data, encoding: .utf8),
+              let regex = try? NSRegularExpression(pattern: #""tags"\s*:\s*(\[\s*(?:"(?:[^"\\]|\\.)*"\s*,?\s*)*\])"#),
+              let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+              let range = Range(match.range(at: 1), in: text),
+              let tags = try? JSONDecoder().decode([String].self, from: Data(text[range].utf8)) else { return [] }
+        return uniqueTags(tags)
     }
     static func scan(_ game: URL) throws -> ContentLibrary {
         let fm = FileManager.default
@@ -48,7 +70,8 @@ struct ContentLibrary {
                                preview: existing(skin.appendingPathComponent("preview.jpg")) ?? existing(skin.appendingPathComponent("preview.png")))
             }
             result.cars.append(.init(id: id, name: metadata(ui, key: "name").nonempty ?? id,
-                                     brand: metadata(ui, key: "brand"), power: metadata(ui, key: "bhp"), weight: metadata(ui, key: "weight"), directory: folder, skins: skins, requiredCSP: ContentRequirements.minimumCSP(in: metadata(ui, key: "description"))))
+                                     brand: metadata(ui, key: "brand"), power: metadata(ui, key: "bhp"), weight: metadata(ui, key: "weight"), directory: folder, skins: skins, requiredCSP: ContentRequirements.minimumCSP(in: metadata(ui, key: "description")),
+                                     carClass: metadata(ui, key: "class"), country: metadata(ui, key: "country"), tags: tags(ui)))
         }
         for folder in folders(game.appendingPathComponent("content/tracks")) {
             let ui = folder.appendingPathComponent("ui")
@@ -65,7 +88,8 @@ struct ContentLibrary {
                 layouts.append(.init(id: id, name: metadata(json, key: "name").nonempty ?? folder.lastPathComponent,
                                      length: metadata(json, key: "length"), preview: existing(root.appendingPathComponent("preview.png")),
                                      outline: existing(root.appendingPathComponent("outline.png")), pits: Int(metadata(json, key: "pitboxes")) ?? 1,
-                                     hasAI: fm.fileExists(atPath: layoutRoot.appendingPathComponent("ai/fast_lane.ai").path)))
+                                     hasAI: fm.fileExists(atPath: layoutRoot.appendingPathComponent("ai/fast_lane.ai").path),
+                                     country: metadata(json, key: "country")))
             }
             if !layouts.isEmpty { result.tracks.append(.init(id: folder.lastPathComponent, name: layouts.first!.name, directory: folder, layouts: layouts)) }
         }

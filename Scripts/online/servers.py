@@ -2,6 +2,7 @@
 import json
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlsplit, parse_qs, urlencode
 from urllib.request import Request, urlopen
 
@@ -53,6 +54,7 @@ def directory_document(text):
             continue
         entries.append(dict(id=f'{host}:{port}', host=host, httpPort=port,
                             name=str(item.get('name', host)), track=str(item.get('track', '')),
+                            carNames=[str(car) for car in item.get('carNames', []) if isinstance(car, str)],
                             clients=int(item.get('players', 0)), capacity=int(item.get('capacity', 0)),
                             password=bool(item.get('passwordProtected', False)),
                             csp=bool(item.get('cspRequired', False)),
@@ -60,8 +62,20 @@ def directory_document(text):
     return dict(items=entries, total=int(result.get('total', 0)), page=int(result.get('page', 1)))
 
 
-def directory(query='', page=1):
-    return directory_document(fetch(DIRECTORY + '?' + urlencode({'q': query[:200], 'page': max(1, page)})))
+def directory(query='', page=1, check_content=False):
+    result = directory_document(fetch(DIRECTORY + '?' + urlencode({'q': query[:200], 'page': max(1, page)})))
+    if check_content:
+        # Bound both fan-out and work per page; unknown content never counts as installed.
+        def load_content(item):
+            try:
+                _, track, cars, _ = server_info(item['id'])
+                item['content'] = dict(track=track, cars=cars)
+            except Exception:
+                pass
+            return item
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            result['items'] = list(pool.map(load_content, result['items'][:10]))
+    return result
 
 
 def asset_id(value):
@@ -70,7 +84,7 @@ def asset_id(value):
     return value
 
 
-def inspect(address):
+def server_info(address):
     host, port = endpoint(address)
     base = f'http://{host}:{port}'
     started = time.monotonic()
@@ -83,6 +97,15 @@ def inspect(address):
     raw_track = info.get('track', '')
     csp = bool(re.fullmatch(r'csp/\d+/\.\./[^/]+', raw_track))
     track = asset_id(raw_track.rsplit('/', 1)[-1] if csp else raw_track)
+    return info, track, cars, latency
+
+
+def inspect(address):
+    host, port = endpoint(address)
+    base = f'http://{host}:{port}'
+    info, track, cars, latency = server_info(address)
+    race_port = int(info.get('tport', info.get('port', 0)))
+    csp = bool(re.fullmatch(r'csp/\d+/\.\./[^/]+', info.get('track', '')))
     # No account ID is needed for browsing free car slots.
     slots = json.loads(fetch(base + '/JSON|0', 256_000))
     free = {}

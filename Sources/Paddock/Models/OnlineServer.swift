@@ -6,11 +6,29 @@ struct OnlineServer: Decodable, Identifiable {
     let httpPort: Int
     let name: String
     let track: String
+    let carNames: [String]
+    let content: ServerContent?
     let clients: Int
     let capacity: Int
     let password: Bool
     let csp: Bool
     let online: Bool
+}
+/// Exact IDs from INFO, independent of the directory's display names.
+struct ServerContent: Decodable {
+    let track: String
+    let cars: [String]
+    func isInstalled(in library: ContentLibrary) -> Bool {
+        !cars.isEmpty && cars.allSatisfy { id in library.cars.contains { $0.id == id } } && installedTrack(in: library) != nil
+    }
+    func installedTrack(in library: ContentLibrary) -> (TrackAsset, TrackLayout)? {
+        for asset in library.tracks {
+            for layout in asset.layouts where asset.id + (layout.id.isEmpty ? "" : "-" + layout.id) == track {
+                return (asset, layout)
+            }
+        }
+        return nil
+    }
 }
 struct OnlineDirectory: Decodable {
     let items: [OnlineServer]
@@ -35,12 +53,7 @@ struct OnlineServerDetails: Decodable {
         cars.filter { model in !library.cars.contains { $0.id == model } }
     }
     func installedTrack(in library: ContentLibrary) -> (TrackAsset, TrackLayout)? {
-        for asset in library.tracks {
-            for layout in asset.layouts where asset.id + (layout.id.isEmpty ? "" : "-" + layout.id) == track {
-                return (asset, layout)
-            }
-        }
-        return nil
+        ServerContent(track: track, cars: cars).installedTrack(in: library)
     }
 }
 /// Transient only: passwords and account IDs never enter presets or history.

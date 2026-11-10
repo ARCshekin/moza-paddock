@@ -27,6 +27,26 @@ final class OnlineBrowser: ObservableObject {
     @Published private(set) var favoritesError: String?
     private let favoritesStore: FavoriteServersStore
     private var favoritesBlocked = false
+
+    @Published var onlyInstalled = false
+    @Published var trackFilter = ""
+    @Published var carFilter = ""
+
+    func filteredServers(in library: ContentLibrary, servers: [OnlineServer]? = nil) -> [OnlineServer] {
+        let track = trackFilter.trimmingCharacters(in: .whitespacesAndNewlines)
+        let car = carFilter.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (servers ?? self.servers).filter { server in
+            var tracks = [server.track, server.content?.track ?? ""]
+            if let (asset, layout) = server.content?.installedTrack(in: library) {
+                tracks += [asset.name, asset.id, layout.name]
+            }
+            let cars = server.carNames + (server.content?.cars ?? []) + library.cars.filter { server.content?.cars.contains($0.id) == true }.map(\.name)
+            return (!onlyAvailable || server.online && server.clients < server.capacity) &&
+                (!onlyInstalled || server.content?.isInstalled(in: library) == true) &&
+                (track.isEmpty || tracks.contains { $0.localizedCaseInsensitiveContains(track) }) &&
+                (car.isEmpty || cars.contains { $0.localizedCaseInsensitiveContains(car) })
+        }
+    }
     private var request = UUID()
 
     init(store: URL = PaddockPaths.current.store) {
@@ -61,8 +81,9 @@ final class OnlineBrowser: ObservableObject {
         let id = UUID(); request = id
         loading = true; error = nil
         let query = self.query
+        let arguments = ["list", "--query", query, "--page", String(page)] + (onlyInstalled ? ["--check-content"] : [])
         DispatchQueue.global(qos: .userInitiated).async {
-            let result: Result<OnlineDirectory, Error> = Result { try Self.run(paths, ["list", "--query", query, "--page", String(page)]) }
+            let result: Result<OnlineDirectory, Error> = Result { try Self.run(paths, arguments) }
             DispatchQueue.main.async {
                 guard self.request == id else { return }
                 self.loading = false

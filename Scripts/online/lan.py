@@ -63,6 +63,7 @@ def discover(ports='9600-9610', targets=None, timeout=1.0):
         try:
             info = inspect(f'{host}:{port}')
             return dict(id=f'{host}:{port}', host=host, httpPort=port, name=info['name'], track=info['track'],
+                        carNames=info['cars'], content=dict(track=info['track'], cars=info['cars']),
                         clients=info['clients'], capacity=info['capacity'], password=info['password'], csp=info['csp'], online=True)
         except Exception:
             return None
