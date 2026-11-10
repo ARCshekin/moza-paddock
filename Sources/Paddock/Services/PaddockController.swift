@@ -269,7 +269,7 @@ final class PaddockController: ObservableObject {
         guard launcher?.isRunning != true else { error = "Предыдущий сеанс ещё закрывается. Подождите завершения Steam."; return }
         guard Self.runningGamePIDs().isEmpty else { error = "Заезд уже идёт. Нажмите «Завершить заезд», чтобы выбрать другой."; return }
         if let connection {
-            do { try connection.validate() } catch { self.error = error.localizedDescription; return }
+            do { try connection.validate(paths: paths) } catch { self.error = error.localizedDescription; return }
             guard connection.server.missingCars(in: library).isEmpty else {
                 error = "Установите все машины сервера, включая машины других участников."; return
             }
@@ -300,12 +300,16 @@ final class PaddockController: ObservableObject {
                 if let connection {
                     let fresh: OnlineServerDetails = try OnlineBrowser.run(paths, ["inspect", "--address", "\(connection.server.host):\(connection.server.httpPort)"])
                     guard fresh.track == connection.server.track, fresh.racePort == connection.server.racePort,
-                          Set(fresh.cars) == Set(connection.server.cars) else {
+                          Set(fresh.cars) == Set(connection.server.cars), fresh.csp == connection.server.csp,
+                          fresh.requiredCSPBuild == connection.server.requiredCSPBuild else {
                         throw PaddockError("Конфигурация сервера изменилась. Обновите сервер перед входом.")
                     }
-                    try OnlineConnection(server: fresh, car: connection.car, player: connection.player, password: connection.password).validate()
+                    try OnlineConnection(server: fresh, car: connection.car, player: connection.player, password: connection.password).validate(paths: paths)
                 }
                 try ContentRequirements.validate(car, game: paths.game)
+                if connection?.server.csp == true {
+                    _ = try Self.wineCommand(paths, ["reg", "add", "HKCU\\Software\\Wine\\AppDefaults\\acs.exe\\DllOverrides", "/v", "dwrite", "/t", "REG_SZ", "/d", "native,builtin", "/f"])
+                }
                 try Self.ensureSteam(paths: paths)
                 try Self.setWheelAngle(snapshot.angle)
                 if connection != nil { OnlineConnection.clearCredentials(paths: paths) }

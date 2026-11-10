@@ -84,6 +84,21 @@ def asset_id(value):
     return value
 
 
+def track_requirement(value):
+    """CSP encodes its minimum build (and optional flags) ahead of the track ID.
+
+    Content Manager: ServerEntry.UpdateValuesAsync and ServerPresetObject.
+    Decode only this protocol envelope, never normalize arbitrary traversal paths.
+    """
+    if not isinstance(value, str):
+        raise ValueError('Некорректный идентификатор трассы')
+    match = re.fullmatch(r'(?:csp/)?(\d{1,9})/\.\./(?:[A-Za-z0-9_-]+/\.\./)?([^/]+)', value)
+    if match:
+        build = int(match.group(1))
+        return asset_id(match.group(2)), max(1061, build)
+    return asset_id(value), None
+
+
 def server_info(address):
     host, port = endpoint(address)
     base = f'http://{host}:{port}'
@@ -94,9 +109,7 @@ def server_info(address):
     if not 1 <= race_port <= 65535:
         raise ValueError('Сервер не сообщил TCP-порт игры')
     cars = [asset_id(car) for car in info.get('cars', [])]
-    raw_track = info.get('track', '')
-    csp = bool(re.fullmatch(r'csp/\d+/\.\./[^/]+', raw_track))
-    track = asset_id(raw_track.rsplit('/', 1)[-1] if csp else raw_track)
+    track, _ = track_requirement(info.get('track', ''))
     return info, track, cars, latency
 
 
@@ -105,7 +118,8 @@ def inspect(address):
     base = f'http://{host}:{port}'
     info, track, cars, latency = server_info(address)
     race_port = int(info.get('tport', info.get('port', 0)))
-    csp = bool(re.fullmatch(r'csp/\d+/\.\./[^/]+', info.get('track', '')))
+    _, required_build = track_requirement(info.get('track', ''))
+    csp = required_build is not None and required_build != 999999
     # No account ID is needed for browsing free car slots.
     slots = json.loads(fetch(base + '/JSON|0', 256_000))
     free = {}
@@ -116,7 +130,7 @@ def inspect(address):
     return dict(host=host, httpPort=port, racePort=race_port, name=str(info.get('name', host)),
                 track=track, cars=cars, free=free, clients=int(info.get('clients', 0)),
                 capacity=int(info.get('maxclients', 0)), password=bool(info.get('pass', False)),
-                pickup=bool(info.get('pickup', False)), csp=csp, latency=latency)
+                pickup=bool(info.get('pickup', False)), csp=csp, latency=latency, requiredCSPBuild=required_build)
 
 
 def clear_session(documents):

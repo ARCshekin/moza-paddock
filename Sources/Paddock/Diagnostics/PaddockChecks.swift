@@ -62,7 +62,7 @@ enum PaddockChecks {
         let remote = INI(url: cfg.appendingPathComponent("race.ini"))
         try check(remote["REMOTE", "SERVER_PORT"] == "9600" && remote["REMOTE", "SERVER_HTTP_PORT"] == "8081" && remote["CAR_0", "DRIVER_NAME"] == "Test Driver", "online uses TCP race port separately from HTTP discovery port")
         var rejected = false
-        do { try OnlineConnection(server: server, car: configuration.car, player: "bad\n[REMOTE]", password: "").validate() } catch { rejected = true }
+        do { try OnlineConnection(server: server, car: configuration.car, player: "bad\n[REMOTE]", password: "").validate(paths: paths) } catch { rejected = true }
         try check(rejected, "online rejects INI injection in transient player credentials")
         OnlineConnection.clearCredentials(paths: paths)
         let cleared = INI(url: cfg.appendingPathComponent("race.ini"))
@@ -105,6 +105,7 @@ enum PaddockChecks {
         let scanned = try ContentLibrary.scan(fixture)
         try check(scanned.cars.first?.name == "Fixture Car" && scanned.tracks.first?.layouts.first?.id == "layout" && scanned.tracks.first?.layouts.first?.hasAI == true, "fixture car, layout and AI scanning")
         try WorkflowChecks.run(root: temp, library: scanned, game: fixture)
+        try CSPOnlineChecks.run(root: temp)
         try check(ContentRequirements.minimumCSP(in: "Minimum CSP Version: 0.2.7<br>Version: 3.2") == "0.2.7", "explicit RSS CSP requirement parsed")
         try check(ContentRequirements.minimumCSP(in: "Minimum CSP Version 0.2.7.") == "0.2.7", "RSS GT-MX CSP requirement parsed")
         try check(ContentRequirements.minimumCSP(in: "Optional CSP lighting support") == nil, "optional CSP visuals do not become a mandatory dependency")

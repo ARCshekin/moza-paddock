@@ -4,7 +4,7 @@ import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 from unittest.mock import patch
-from online.servers import directory, directory_document, endpoint, inspect, clear_session
+from online.servers import directory, directory_document, endpoint, inspect, clear_session, track_requirement
 
 item = dict(joinUrl='acmanager://race/online/join?ip=127.0.0.1&httpPort=8081',
             name='Test', track='Magione', carNames=['BMW M3'], players=1, capacity=12, status='Online')
@@ -31,6 +31,17 @@ for invalid in ('http://user:pass@example.com', 'file:///tmp/a', 'host:70000', '
     else:
         raise AssertionError(invalid)
 
+assert track_requirement('spa') == ('spa', None)
+assert track_requirement('csp/3000/../spa') == ('spa', 3000)
+assert track_requirement('csp/3000/../B/../spa') == ('spa', 3000)
+assert track_requirement('3000/../spa') == ('spa', 3000)
+assert track_requirement('csp/0/../spa') == ('spa', 1061)
+assert track_requirement('999999/../spa') == ('spa', 999999)
+for unsafe in ('csp/3000/../../spa', 'csp/3000/../B/../../spa', 'csp/no/../spa', '../spa'):
+    try: track_requirement(unsafe)
+    except ValueError: pass
+    else: raise AssertionError('unsafe CSP track envelope: ' + unsafe)
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args): pass
     def do_GET(self):
@@ -55,6 +66,10 @@ try:
         try: inspect('127.0.0.1:8081')
         except ValueError: pass
         else: raise AssertionError('unsafe track accepted')
+    for raw, build, required in [('csp/3000/../spa', 3000, True), ('csp/3000/../B/../spa', 3000, True), ('999999/../spa', 999999, False)]:
+        with patch('online.servers.fetch', side_effect=[json.dumps(dict(track=raw, cars=['test'], tport=9600, pickup=True)), '{"Cars":[]}']):
+            decoded = inspect('127.0.0.1:8081')
+            assert decoded['track'] == 'spa' and decoded['requiredCSPBuild'] == build and decoded['csp'] == required
 finally:
     server.shutdown(); server.server_close(); thread.join()
 print('PASS online: directory decoding, invites, bounded local INFO/JSON, reserved slots and input validation')
