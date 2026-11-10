@@ -121,7 +121,7 @@ struct OnlineView: View {
                     }.buttonStyle(.plain).disabled(busy)
                 }
             }
-            Text("Перед входом обновляются данные сервера. Сейчас доступны обычные pickup-серверы; бронирование и вход на CSP-серверы ещё в разработке.")
+            Text("Перед входом обновляются данные сервера. Для CSP-серверов нужен включённый патч подходящей сборки в выбранной игре. Бронирование мест пока не поддерживается.")
                 .font(.caption).foregroundStyle(.secondary)
         }.onAppear { refreshSelected() }
             .onChange(of: browser.source) { _ in
@@ -164,7 +164,13 @@ struct OnlineView: View {
                 TextField("Имя пилота", text: $browser.player).textFieldStyle(.roundedBorder)
                 if server.password { SecureField("Пароль сервера", text: $browser.password).textFieldStyle(.roundedBorder) }
             }
-            if server.csp { Text("Требуется CSP · подключение в этой версии пока недоступно").font(.caption).foregroundStyle(.orange) }
+            if let error = server.cspError(paths: model.paths) {
+                Label(error, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.orange)
+            } else if server.csp {
+                let patch = CSPInstallation(game: model.paths.game, documents: model.paths.documents)
+                Label(patch.title + " · требование сервера выполнено", systemImage: "checkmark.circle")
+                    .font(.caption).foregroundStyle(.green)
+            }
             if !server.pickup { Text("Требуется бронирование места").font(.caption).foregroundStyle(.orange) }
             HStack {
                 Button("Обновить места") { inspect("\(server.host):\(server.httpPort)") }.disabled(busy)
@@ -175,7 +181,7 @@ struct OnlineView: View {
                     model.launch(online: connection)
                     browser.password = ""
                 }.buttonStyle(.borderedProminent)
-                    .disabled(busy || model.operation != nil || model.gameRunning || server.csp || !server.pickup ||
+                    .disabled(busy || model.operation != nil || model.gameRunning || server.cspError(paths: model.paths) != nil || !server.pickup ||
                               server.installedTrack(in: model.library) == nil || !server.missingCars(in: model.library).isEmpty || !model.library.cars.contains { $0.id == browser.car } || (server.free[browser.car] ?? 0) == 0)
             }
         }.paddockPanel()
