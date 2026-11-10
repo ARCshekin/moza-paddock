@@ -44,9 +44,14 @@ with TemporaryDirectory() as temporary:
         duplicate = subprocess.run(['/bin/zsh', '-c', body + '\nprevious_exit() { return 6; }\nprevious_exit\ncleanup_session'], env=env, capture_output=True)
         assert duplicate.returncode == 6 and bridge.poll() is None and not marker.exists()
         failed = subprocess.run(['/bin/zsh', '-c', body + '\nprevious_exit() { return 1; }\nprevious_exit\ncleanup_session'], env=env, capture_output=True)
-        assert failed.returncode == 1 and marker.exists()
+        assert failed.returncode == 1 and not marker.exists()
         bridge.wait(timeout=2)
+        for code in [5, 99]:
+            result = subprocess.run(['/bin/zsh', '-c', body + f'\nprevious_exit() {{ return {code}; }}\nprevious_exit\ncleanup_session'], env=dict(env, bridge_pid=''), capture_output=True)
+            assert result.returncode == code and not marker.exists()
+        clean = subprocess.run(['/bin/zsh', '-c', body + '\ntrue\ncleanup_session'], env=dict(env, bridge_pid=''), capture_output=True)
+        assert clean.returncode == 0 and marker.exists()
     finally:
         if bridge.poll() is None:
             bridge.terminate(); bridge.wait()
-print('PASS launcher ownership: duplicate leaves the first bridge/prefix alive; normal cleanup preserves the game exit code')
+print('PASS launcher ownership: duplicate leaves the first bridge/prefix alive; failed launch preserves Steam, normal exit cleans its session')

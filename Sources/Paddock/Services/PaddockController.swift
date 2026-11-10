@@ -388,8 +388,8 @@ final class PaddockController: ObservableObject {
 
     private static func closeSession(paths: PaddockPaths, online: Bool) {
         if online { OnlineConnection.clearCredentials(paths: paths) }
-        _ = try? command("/usr/bin/python3", [paths.project.appendingPathComponent("Scripts/paddock-runtime.py").path,
-            "--root", paths.store.path, "shutdown", "--provider", paths.runtime.rawValue, "--bottle", paths.bottle])
+        // A preparation failure must not close Steam that the user is still using.
+        // The owned bridge is stopped by the shell launcher if it was started.
     }
 
     func stopGame() {
